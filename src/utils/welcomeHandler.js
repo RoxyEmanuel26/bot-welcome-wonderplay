@@ -36,42 +36,41 @@ export async function sendWelcomeMessage(member, channel) {
             messageId = messageObj.id;
         }
 
-        // 2. Siapkan Canvas Image (jika diaktifkan)
-        let attachment = null;
+        // 2. Siapkan dan Kirim Canvas Image + Embed ke Channel Banner
         if (process.env.USE_CANVAS_IMAGE?.toLowerCase() === 'on') {
             try {
-                const buffer = await buildWelcomeImage(member);
-                attachment = new AttachmentBuilder(buffer, { name: 'welcome-image.png' });
+                const bannerChannelId = process.env.WELCOME_CHANNEL_BANNER_ID;
+                if (bannerChannelId) {
+                    const bannerChannel = member.guild.channels.cache.get(bannerChannelId);
+                    if (bannerChannel) {
+                        const buffer = await buildWelcomeImage(member);
+                        const attachment = new AttachmentBuilder(buffer, { name: 'welcome-image.png' });
+
+                        // Buat Embed untuk disatukan dengan gambar
+                        const embed = new EmbedBuilder()
+                            .setColor('#e94560')
+                            .setTitle(`🎉 Welcome to ${member.guild.name}!`)
+                            .setDescription(finalText)
+                            .setThumbnail(member.user.displayAvatarURL())
+                            .setImage('attachment://welcome-image.png')
+                            .setTimestamp()
+                            .setFooter({ text: `Member #${member.guild.memberCount}`, iconURL: member.guild.iconURL() });
+
+                        await bannerChannel.send({ content: `<@${member.id}>`, embeds: [embed], files: [attachment] });
+                        console.log(`✅ Banner Embed sent to channel ${bannerChannelId}`);
+                    } else {
+                        console.warn(`⚠️ Banner channel ${bannerChannelId} tidak ditemukan.`);
+                    }
+                } else {
+                    console.warn(`⚠️ WELCOME_CHANNEL_BANNER_ID belum diatur di .env!`);
+                }
             } catch (canvasErr) {
-                console.error('⚠️ Canvas generation failed, sending without image:', canvasErr.message);
+                console.error('⚠️ Canvas generation failed:', canvasErr.message);
             }
         }
 
-        // 3. Kirim Pesan (Pakai Embed atau Teks Biasa)
-        if (process.env.USE_EMBED?.toLowerCase() === 'on') {
-            const embed = new EmbedBuilder()
-                .setColor('#e94560')
-                .setTitle(`🎉 Welcome to ${member.guild.name}!`)
-                .setDescription(finalText)
-                .setThumbnail(member.user.displayAvatarURL())
-                .setTimestamp()
-                .setFooter({ text: `Member #${member.guild.memberCount}`, iconURL: member.guild.iconURL() });
-
-            if (attachment) {
-                embed.setImage('attachment://welcome-image.png');
-                await channel.send({ embeds: [embed], files: [attachment] });
-            } else {
-                await channel.send({ content: `<@${member.id}>`, embeds: [embed] });
-            }
-
-        } else {
-            // Teks Biasa (Bukan Embed)
-            if (attachment) {
-                await channel.send({ content: finalText, files: [attachment] });
-            } else {
-                await channel.send({ content: finalText });
-            }
-        }
+        // 3. Kirim Teks Biasa (Tanpa Embed dan Banner) ke Main Welcome Channel
+        await channel.send({ content: finalText });
 
         // 4. Update Stats (Selalu Menyala)
         updateStats(messageId);

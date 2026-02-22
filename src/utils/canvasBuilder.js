@@ -12,57 +12,73 @@ if (!fs.existsSync(ASSETS_DIR)) {
     fs.mkdirSync(ASSETS_DIR, { recursive: true });
 }
 
+// Tunggu registrasi dipindahkan ke dalam scope function
+
 /**
  * Generate sebuah welcome image dengan Canvas
  * @param {import('discord.js').GuildMember} member 
  * @returns {Promise<Buffer>} Buffer gambar PNG
  */
 export async function buildWelcomeImage(member) {
+    // 0. Register Custom Fonts tepat sebelum Canvas dibuat agar terbaca di memory
+    const puffberryPath = path.join(ASSETS_DIR, 'Puffberry.ttf');
+    if (fs.existsSync(puffberryPath)) {
+        registerFont(puffberryPath, { family: 'Puffberry' });
+    }
+
     const canvas = createCanvas(1024, 450);
     const ctx = canvas.getContext('2d');
 
-    // 1. Gambar Background (Bisa pakai gambar lokal kalau ada, atau warna gradien)
-    const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-    gradient.addColorStop(0, '#1a1a2e'); // Warna gelap
-    gradient.addColorStop(1, '#16213e');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // Tambah pattern/garis hiasan simple
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
-    ctx.lineWidth = 10;
-    for (let i = 0; i < canvas.width; i += 50) {
-        ctx.beginPath();
-        ctx.moveTo(i, 0);
-        ctx.lineTo(i - 200, canvas.height);
-        ctx.stroke();
+    // 1. Gambar Background dari file lokal
+    const bgPath = path.join(ASSETS_DIR, 'welcome.jpg');
+    try {
+        if (fs.existsSync(bgPath)) {
+            const background = await loadImage(bgPath);
+            ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
+        } else {
+            console.warn('⚠️ File assets/welcome.jpg tidak ditemukan, beralih ke warna gelap');
+            ctx.fillStyle = '#16213e';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+    } catch (err) {
+        console.error('Error loading background image:', err);
     }
 
-    // 2. Teks "WELCOME"
-    ctx.font = 'bold 70px "Segoe UI", sans-serif';
-    ctx.fillStyle = '#ffffff';
+    const textX = 665; // Agak digeser ke kiri agar pas di tengah 'WONDERPLAY'
+
+    // 2. Teks "WELCOME" (Di atas teks WONDERPLAY)
+    ctx.font = '60px Puffberry'; // Hapus quotes dan sans-serif fallback agar canvas terpaksa memuat custom font
+    ctx.fillStyle = '#fdc4bdff'; // Warna peach pastel request user
+    ctx.strokeStyle = '#ffffff'; // Border putih
+    ctx.lineWidth = 4;
     ctx.textAlign = 'center';
-    ctx.fillText('WELCOME TO', canvas.width / 2 + 100, 150);
+    ctx.strokeText('WELCOME', 650, 175);
+    ctx.fillText('WELCOME', 650, 175);
 
-    // 3. Nama Server
-    ctx.font = 'bold 85px "Segoe UI", sans-serif';
-    ctx.fillStyle = '#e94560'; // Warna aksen Wonderplay
-    ctx.fillText(member.guild.name.toUpperCase(), canvas.width / 2 + 100, 240);
+    // 3. Nickname Member (Posisi di tengah bawah tulisan WONDERPLAY)
+    ctx.font = 'bold 50px "Segoe UI", sans-serif';
+    ctx.fillStyle = '#16213e'; // Warna teks gelap
+    ctx.strokeStyle = '#ffffff'; // Border putih
+    ctx.lineWidth = 5;
+    ctx.textAlign = 'center';
 
-    // 4. Nickname Member
-    ctx.font = '50px "Segoe UI", sans-serif';
-    ctx.fillStyle = '#cccccc';
-    ctx.fillText(member.user.username, canvas.width / 2 + 100, 320);
+    // ctx.strokeText("aero", textX, 310);
+    // ctx.fillText("aero", textX, 310);
+    ctx.strokeText(member.user.username, textX, 310);
+    ctx.fillText(member.user.username, textX, 310);
 
-    // 5. Urutan Member
-    ctx.font = '30px "Segoe UI", sans-serif';
-    ctx.fillStyle = '#888888';
-    ctx.fillText(`Member #${member.guild.memberCount}`, canvas.width / 2 + 100, 380);
+    // 3. Urutan Member
+    ctx.font = '35px "Segoe UI", sans-serif';
+    ctx.fillStyle = '#2b2d31';
+    ctx.strokeStyle = '#ffffff'; // Border putih
+    ctx.lineWidth = 4;
+    ctx.strokeText(`Member #${member.guild.memberCount}`, textX, 365);
+    ctx.fillText(`Member #${member.guild.memberCount}`, textX, 365);
 
-    // 6. Gambar Avatar (Bentuk Lingkaran)
-    const avatarSize = 250;
-    const avatarX = 100;
-    const avatarY = (canvas.height / 2) - (avatarSize / 2);
+    // 4. Gambar Avatar (Bentuk Lingkaran, diperkecil 20px)
+    const avatarSize = 235; // Semula 255
+    const avatarX = 135; // Digeser 10px ke kanan agar tetap di tengah
+    const avatarY = 105; // Digeser 10px ke bawah agar tetap di tengah
 
     ctx.save();
     ctx.beginPath();
@@ -76,18 +92,17 @@ export async function buildWelcomeImage(member) {
         ctx.drawImage(avatar, avatarX, avatarY, avatarSize, avatarSize);
     } catch (e) {
         console.error('Error loading avatar image for canvas:', e);
-        // Fallback warna abu-abu kalau gagal fetch avatar
         ctx.fillStyle = '#333333';
         ctx.fill();
     }
 
     ctx.restore();
 
-    // 7. Lingkaran luar (Border) Profil
+    // 5. Lingkaran tepi Avatar (Border Cyan)
     ctx.beginPath();
-    ctx.arc(avatarX + avatarSize / 2, avatarY + avatarSize / 2, (avatarSize / 2) + 10, 0, Math.PI * 2, true);
-    ctx.strokeStyle = '#e94560'; // Warna aksen
-    ctx.lineWidth = 15;
+    ctx.arc(avatarX + avatarSize / 2, avatarY + avatarSize / 2, (avatarSize / 2), 0, Math.PI * 2, true);
+    ctx.strokeStyle = '#2cb1c2'; // Warna teks cyan Wonderplay
+    ctx.lineWidth = 12; // Tebal border
     ctx.stroke();
 
     return canvas.toBuffer('image/png');

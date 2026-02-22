@@ -48,6 +48,7 @@ Statistik bot yang selalu menyala dan sinkron dengan server Discord secara real-
 | `!welcome @user` | Manage Guild | Kirim welcome message ke user tertentu |
 | `!welc` | Administrator | Test welcome message di channel target |
 | `!stats` | Administrator | Lihat statistik bot |
+| `?fitur` | Semua Member | Menampilkan menu bantuan dan semua command bot |
 | `?roulettevoice` | Semua Member | Acak pembagian tim Valorant dari voice |
 | `?roulettevoice @user1 @user2` | Semua Member | Acak tim, exclude user yang di-tag |
 | `?testroulettevoice` | Administrator | Test roulette dengan dummy data |
@@ -165,6 +166,7 @@ bot-welcome-wonderplay/
 │   ├── commands/
 │   │   ├── rouletteVoice.js      # ?roulettevoice command
 │   │   ├── testRouletteVoice.js  # ?testroulettevoice (admin test)
+│   │   ├── fitur.js              # ?fitur command (help/menu)
 │   │   ├── stats.js              # !stats command
 │   │   ├── welcome.js            # /welcome slash command
 │   │   ├── welcomePrefix.js      # !welcome prefix command
