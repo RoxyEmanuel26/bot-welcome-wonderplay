@@ -8,6 +8,11 @@ export default {
         // Ignore bots
         if (member.user.bot) return;
 
+        // Cek config toggle
+        if (process.env.FITUR_GOODBYE?.toLowerCase() !== 'on') {
+            return;
+        }
+
         console.log(`\n🚪 MEMBER LEAVE: ${member.user.tag} | ${member.guild.name}`);
 
         const channelId = process.env.WELCOME_CHANNEL_ID;

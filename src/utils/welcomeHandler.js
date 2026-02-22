@@ -16,8 +16,11 @@ export async function sendWelcomeMessage(member, channel) {
         let finalText = '';
         let messageId = 0; // default ID
 
-        // Coba pakai Gemini AI dulu
-        const aiMessage = await generateWelcomeAI(member);
+        // Coba pakai Gemini AI dulu kalau fiturnya dinyalakan
+        let aiMessage = null;
+        if (process.env.USE_GEMINI_AI?.toLowerCase() === 'on') {
+            aiMessage = await generateWelcomeAI(member);
+        }
 
         if (aiMessage) {
             finalText = `<@${member.id}>, AI says: \n${aiMessage}`;
@@ -35,7 +38,7 @@ export async function sendWelcomeMessage(member, channel) {
 
         // 2. Siapkan Canvas Image (jika diaktifkan)
         let attachment = null;
-        if (process.env.ENABLE_WELCOME_IMAGE === 'true') {
+        if (process.env.USE_CANVAS_IMAGE?.toLowerCase() === 'on') {
             try {
                 const buffer = await buildWelcomeImage(member);
                 attachment = new AttachmentBuilder(buffer, { name: 'welcome-image.png' });
@@ -45,7 +48,7 @@ export async function sendWelcomeMessage(member, channel) {
         }
 
         // 3. Kirim Pesan (Pakai Embed atau Teks Biasa)
-        if (process.env.USE_EMBED === 'true') {
+        if (process.env.USE_EMBED?.toLowerCase() === 'on') {
             const embed = new EmbedBuilder()
                 .setColor('#e94560')
                 .setTitle(`🎉 Welcome to ${member.guild.name}!`)
@@ -70,7 +73,7 @@ export async function sendWelcomeMessage(member, channel) {
             }
         }
 
-        if (process.env.ENABLE_STATS === 'true') {
+        if (process.env.FITUR_STATS?.toLowerCase() === 'on') {
             updateStats(messageId);
         }
 
