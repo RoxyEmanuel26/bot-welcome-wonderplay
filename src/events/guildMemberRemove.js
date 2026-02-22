@@ -8,6 +8,10 @@ export default {
         // Ignore bots
         if (member.user.bot) return;
 
+        // Update Bot Activity realtime
+        const totalMembers = client.guilds.cache.reduce((a, g) => a + g.memberCount, 0);
+        client.user.setActivity(`${totalMembers} Members | Owner AeroKatzh`, { type: 3 });
+
         // Cek config toggle
         if (process.env.FITUR_GOODBYE?.toLowerCase() !== 'on') {
             return;

@@ -7,23 +7,24 @@ export default {
   name: 'stats',
   description: 'Lihat statistik bot (Admin/Owner only)',
   permissions: [PermissionFlagsBits.Administrator],
-  
+
   async execute(message, args, client) {
     const permCheck = checkPermissions(message, this.permissions);
-    
+
     if (!permCheck.allowed) {
       return message.reply(createPermissionEmbed(['Administrator', 'Server Owner']));
     }
 
     const stats = getStats();
     const messagesCount = getMessagesCount();
-    
+
     const statsEmbed = {
       embeds: [{
         color: 0xFF1493,
         title: '📊 WonderPlay Bot Statistics',
         fields: [
-          { name: '👋 Total Welcomes', value: `${stats.totalWelcomes}`, inline: true },
+          { name: '👥 Total Members', value: `${client.guilds.cache.reduce((a, g) => a + g.memberCount, 0)}`, inline: true },
+          { name: '👋 Welcomes Sent', value: `${stats.totalWelcomes}`, inline: true },
           { name: '📨 Messages Pool', value: `${messagesCount}`, inline: true },
           { name: '🎯 Servers', value: `${client.guilds.cache.size}`, inline: true },
           { name: '⏰ Last Welcome', value: stats.lastWelcome || 'Never', inline: false }

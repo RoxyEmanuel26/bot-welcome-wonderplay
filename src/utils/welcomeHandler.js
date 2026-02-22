@@ -73,9 +73,8 @@ export async function sendWelcomeMessage(member, channel) {
             }
         }
 
-        if (process.env.FITUR_STATS?.toLowerCase() === 'on') {
-            updateStats(messageId);
-        }
+        // 4. Update Stats (Selalu Menyala)
+        updateStats(messageId);
 
         console.log(`✅ Welcome sent for ${member.user.tag} | Message ID: ${messageId}`);
         return true;

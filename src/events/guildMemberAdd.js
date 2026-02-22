@@ -18,6 +18,10 @@ export default {
 
         console.log(`\n👋 NEW MEMBER: ${member.user.tag} | ${member.guild.name}`);
 
+        // Update Bot Activity realtime
+        const totalMembers = client.guilds.cache.reduce((a, g) => a + g.memberCount, 0);
+        client.user.setActivity(`${totalMembers} Members | Owner AeroKatzh`, { type: 3 });
+
         // 1. AUTO-ROLE FEATURE
         if (process.env.FITUR_AUTO_ROLE?.toLowerCase() === 'on') {
             const roleId = process.env.AUTO_ROLE_ID;
