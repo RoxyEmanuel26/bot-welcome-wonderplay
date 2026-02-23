@@ -37,26 +37,29 @@ export async function sendWelcomeMessage(member, channel) {
         }
 
         // 2. Siapkan dan Kirim Canvas Image + Embed ke Channel Banner
-        if (process.env.USE_CANVAS_IMAGE?.toLowerCase() === 'on') {
+        if (process.env.FITUR_WELCOME_BANNER?.toLowerCase() === 'on') {
             try {
                 const bannerChannelId = process.env.WELCOME_CHANNEL_BANNER_ID;
                 if (bannerChannelId) {
                     const bannerChannel = member.guild.channels.cache.get(bannerChannelId);
                     if (bannerChannel) {
-                        const buffer = await buildWelcomeImage(member);
-                        const attachment = new AttachmentBuilder(buffer, { name: 'welcome-image.png' });
-
-                        // Buat Embed untuk disatukan dengan gambar
                         const embed = new EmbedBuilder()
                             .setColor('#e94560')
                             .setTitle(`🎉 Welcome to ${member.guild.name}!`)
                             .setDescription(finalText)
                             .setThumbnail(member.user.displayAvatarURL())
-                            .setImage('attachment://welcome-image.png')
                             .setTimestamp()
                             .setFooter({ text: `Member #${member.guild.memberCount}`, iconURL: member.guild.iconURL() });
 
-                        await bannerChannel.send({ content: `<@${member.id}>`, embeds: [embed], files: [attachment] });
+                        const files = [];
+                        if (process.env.USE_CANVAS_IMAGE?.toLowerCase() === 'on') {
+                            const buffer = await buildWelcomeImage(member);
+                            const attachment = new AttachmentBuilder(buffer, { name: 'welcome-image.png' });
+                            embed.setImage('attachment://welcome-image.png');
+                            files.push(attachment);
+                        }
+
+                        await bannerChannel.send({ content: `<@${member.id}>`, embeds: [embed], files });
                         console.log(`✅ Banner Embed sent to channel ${bannerChannelId}`);
                     } else {
                         console.warn(`⚠️ Banner channel ${bannerChannelId} tidak ditemukan.`);
@@ -65,12 +68,14 @@ export async function sendWelcomeMessage(member, channel) {
                     console.warn(`⚠️ WELCOME_CHANNEL_BANNER_ID belum diatur di .env!`);
                 }
             } catch (canvasErr) {
-                console.error('⚠️ Canvas generation failed:', canvasErr.message);
+                console.error('⚠️ Banner/Canvas generation failed:', canvasErr.message);
             }
         }
 
         // 3. Kirim Teks Biasa (Tanpa Embed dan Banner) ke Main Welcome Channel
-        await channel.send({ content: finalText });
+        if (process.env.FITUR_WELCOME_MESSAGE?.toLowerCase() === 'on') {
+            await channel.send({ content: finalText });
+        }
 
         // 4. Update Stats (Selalu Menyala)
         updateStats(messageId);
