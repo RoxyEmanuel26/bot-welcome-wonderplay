@@ -9,6 +9,7 @@ import { Client, GatewayIntentBits, Partials, Collection, REST, Routes } from 'd
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { readdirSync } from 'fs';
+import connectDB from './database/connection.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -27,6 +28,12 @@ client.commands = new Collection();
 client.slashCommands = new Collection();
 
 // ═══════════════════════════════════════════════════════════════
+// 📂 KONEKSI DATABASE
+// ═══════════════════════════════════════════════════════════════
+
+connectDB();
+
+// ═══════════════════════════════════════════════════════════════
 // 📂 LOAD COMMANDS (Prefix & Slash)
 // ═══════════════════════════════════════════════════════════════
 
@@ -38,21 +45,19 @@ for (const file of commandFiles) {
     const command = await import(`./commands/${file}`);
     const cmd = command.default;
 
-    // Load prefix commands (semua command dengan name & execute)
+    // Load prefix commands
     if (cmd.name && cmd.execute) {
         client.commands.set(cmd.name, cmd);
 
-        // Load aliases juga
         if (cmd.aliases && Array.isArray(cmd.aliases)) {
             cmd.aliases.forEach(alias => {
                 client.commands.set(alias, cmd);
             });
         }
-
         console.log(`✅ Loaded command: !${cmd.name}`);
     }
 
-    // Load slash commands (command dengan data property)
+    // Load slash commands
     if (cmd.data) {
         client.slashCommands.set(cmd.data.name, cmd);
         slashCommandsData.push(cmd.data.toJSON());
@@ -76,7 +81,6 @@ for (const file of eventFiles) {
     } else {
         client.on(eventName, (...args) => event.default.execute(...args, client));
     }
-
     console.log(`✅ Loaded event: ${eventName}`);
 }
 
@@ -85,24 +89,54 @@ for (const file of eventFiles) {
 // ═══════════════════════════════════════════════════════════════
 
 client.on('interactionCreate', async interaction => {
-    if (!interaction.isChatInputCommand()) return;
+    if (interaction.isButton()) {
+        const customId = interaction.customId;
 
-    const command = client.slashCommands.get(interaction.commandName);
-
-    if (!command) {
-        console.error(`❌ Slash command ${interaction.commandName} not found`);
+        if (customId === 'sk_start') {
+            // Handler di-delegate ke lobby/game manager, tapi secara sederhana kita dapat menangani lewat interaction
+            const activeGames = Array.from((await import('./games/GameManager.js')).default.activeGames.values());
+            const game = activeGames.find(g => g.lobbyMessage && g.lobbyMessage.id === interaction.message.id);
+            if (game) {
+                if (interaction.user.id !== game.hostId) {
+                    return interaction.reply({ content: '❌ Hanya Host yang dapat memulai permainan!', ephemeral: true });
+                }
+                if (game.players.size < 2) {
+                    return interaction.reply({ content: '❌ Minimal butuh 2 pemain untuk memulai!', ephemeral: true });
+                }
+                await interaction.deferUpdate();
+                await game.startGame(interaction.channel);
+            } else {
+                return interaction.reply({ content: '❌ Game tidak ditemukan atau sudah dimulai/berakhir.', ephemeral: true });
+            }
+        } else if (customId === 'sk_cancel') {
+            const activeGames = Array.from((await import('./games/GameManager.js')).default.activeGames.values());
+            const game = activeGames.find(g => g.lobbyMessage && g.lobbyMessage.id === interaction.message.id);
+            if (game) {
+                if (interaction.user.id !== game.hostId) {
+                    return interaction.reply({ content: '❌ Hanya Host yang dapat membatalkan permainan!', ephemeral: true });
+                }
+                await interaction.deferUpdate();
+                await interaction.message.edit({ components: [] });
+                await interaction.channel.send('✅ Permainan Dibatalkan oleh Host.');
+                (await import('./games/GameManager.js')).default.endGame(game.guildId, game.channelId);
+            } else {
+                return interaction.reply({ content: '❌ Game tidak ditemukan atau sudah dibatalkan.', ephemeral: true });
+            }
+        }
         return;
     }
 
+    if (!interaction.isChatInputCommand()) return;
+
+    const command = client.slashCommands.get(interaction.commandName);
+    if (!command) return;
+
     try {
-        await command.execute(interaction);
+        await command.execute(interaction, [], client);
     } catch (error) {
         console.error(`❌ Error executing /${interaction.commandName}:`, error);
 
-        const errorMessage = {
-            content: '❌ Terjadi error saat menjalankan command!',
-            ephemeral: true
-        };
+        const errorMessage = { content: '❌ Terjadi error saat menjalankan command!', ephemeral: true };
 
         if (interaction.replied || interaction.deferred) {
             await interaction.followUp(errorMessage);
@@ -113,55 +147,24 @@ client.on('interactionCreate', async interaction => {
 });
 
 // ═══════════════════════════════════════════════════════════════
-// 💬 PREFIX COMMAND HANDLER (!command & ?command)
-// ═══════════════════════════════════════════════════════════════
-
-client.on('messageCreate', async (message) => {
-    if (message.author.bot) return;
-
-    // Support kedua prefix: ! dan ?
-    const prefixes = ['!', '?'];
-    const usedPrefix = prefixes.find(p => message.content.startsWith(p));
-    if (!usedPrefix) return;
-
-    const args = message.content.slice(usedPrefix.length).trim().split(/ +/);
-    const commandName = args.shift().toLowerCase();
-
-    const command = client.commands.get(commandName);
-
-    if (!command) return;
-
-    try {
-        await command.execute(message, args, client);
-    } catch (error) {
-        console.error(`❌ Error executing ${usedPrefix}${commandName}:`, error);
-        await message.reply('❌ Ada error saat execute command!');
-    }
-});
-
-// ═══════════════════════════════════════════════════════════════
 // 🚀 BOT READY & REGISTER SLASH COMMANDS
 // ═══════════════════════════════════════════════════════════════
 
 client.once('ready', async () => {
     console.log('\n═══════════════════════════════════════════════════════════');
-    console.log(`✅ Bot sudah online sebagai ${client.user.tag}`);
+    console.log(`✅ Bot online sebagai ${client.user.tag}`);
     console.log(`📊 Loaded ${client.commands.size} prefix commands`);
     console.log(`📊 Loaded ${client.slashCommands.size} slash commands`);
     console.log('═══════════════════════════════════════════════════════════\n');
 
-    // Register slash commands
     if (slashCommandsData.length > 0) {
         try {
             console.log('🔄 Registering slash commands...');
-
             const rest = new REST().setToken(process.env.DISCORD_TOKEN);
-
             await rest.put(
                 Routes.applicationCommands(client.user.id),
                 { body: slashCommandsData }
             );
-
             console.log('✅ Slash commands registered successfully!\n');
         } catch (error) {
             console.error('❌ Error registering slash commands:', error);

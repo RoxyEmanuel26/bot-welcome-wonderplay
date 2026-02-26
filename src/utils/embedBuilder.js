@@ -1,0 +1,113 @@
+import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
+
+export function createLobbyEmbed(level, levelName, hostUser, levelConfig, players, timeLeft) {
+    const embed = new EmbedBuilder()
+        .setTitle(`🎮 SAMBUNG KATA | Level ${level} - ${levelName}`)
+        .setDescription('Sambung kata dari huruf terakhir!\nReply pesan ini untuk JOIN!')
+        .setColor(levelConfig.color)
+        .addFields(
+            { name: "👑 Host", value: `<@${hostUser.id}>`, inline: true },
+            { name: "⚙️ Level", value: `Level ${level} - ${levelName}`, inline: true },
+            { name: "⏱️ Waktu Jawab", value: `${levelConfig.timeLimit} detik/giliran`, inline: true },
+            { name: "❤️ Nyawa", value: `${levelConfig.lives} kesempatan salah`, inline: true },
+            { name: "📊 Sistem Sambung", value: levelConfig.systemDesc, inline: true },
+            { name: "💰 Max Point", value: `${levelConfig.maxPoint} point/jawaban`, inline: true },
+            { name: `👥 Pemain (${players.length}/10)`, value: players.length > 0 ? players.map((p, i) => `${i + 1}. <@${p.id}>`).join('\n') : 'Menunggu pemain...', inline: false },
+            { name: "⏳ Lobby Tutup", value: `${timeLeft} detik lagi...`, inline: false }
+        )
+        .setFooter({ text: "WonderPlay Sambung Kata • Min 2 pemain" });
+
+    const components = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setLabel("▶️ MULAI").setStyle(ButtonStyle.Success).setCustomId("sk_start"),
+        new ButtonBuilder().setLabel("❌ BATAL").setStyle(ButtonStyle.Danger).setCustomId("sk_cancel")
+    );
+
+    return { embeds: [embed], components: [components] };
+}
+
+export function createTurnEmbed(user, previousWord, suffix, suffixLength, levelConfig, livesEmoji, bonusesStr, scoreboardStr, usedWordsStr) {
+    const embed = new EmbedBuilder()
+        .setTitle(`🎯 GILIRAN ${user.username.toUpperCase()}`)
+        .setDescription(`Kata sebelumnya: **${previousWord}**\nSambung dengan: **[${suffix.toUpperCase()}]** (${suffixLength} huruf)\n\n⏱️ Kamu punya **${levelConfig.timeLimit} detik** untuk menjawab!`)
+        .setColor(levelConfig.color)
+        .addFields(
+            { name: "❤️ Nyawa Kamu", value: livesEmoji, inline: true },
+            { name: "💰 Max Point", value: `${levelConfig.maxPoint} point`, inline: true },
+            { name: "⚡ Bonus Speed", value: `Jawab < ${Math.floor(levelConfig.timeLimit * 0.2)} detik!`, inline: true },
+            { name: "📊 Skor Sementara", value: scoreboardStr || "Belum ada poin", inline: false },
+            { name: "📝 Kata Terpakai", value: usedWordsStr || "Belum ada", inline: false }
+        );
+
+    return { content: `<@${user.id}>, giliranmu!`, embeds: [embed] };
+}
+
+export function createCorrectEmbed(user, word, responseTime, definition, pointsEarned, totalPoints, activeBonuses) {
+    const embed = new EmbedBuilder()
+        .setTitle(`✅ BENAR! +${pointsEarned} POINT`)
+        .setDescription(`<@${user.id}> menjawab **${word.toUpperCase()}** dalam ${responseTime}s!\nDefinisi: *${definition}*`)
+        .setColor("#00FF87")
+        .addFields(
+            { name: "⚡ Kecepatan", value: `${responseTime} detik`, inline: true },
+            { name: "💰 Point Didapat", value: `+${pointsEarned} point`, inline: true },
+            { name: "📊 Total Point", value: `${totalPoints} point`, inline: true }
+        );
+
+    if (activeBonuses && activeBonuses.length > 0) {
+        embed.addFields({ name: "🔥 Bonus Aktif", value: activeBonuses.map(b => `${b.name}! +${b.value}`).join(' | '), inline: false });
+    }
+
+    return { embeds: [embed] };
+}
+
+export function createWrongEmbed(user, word, reason, livesEmoji, timeLeft) {
+    const embed = new EmbedBuilder()
+        .setTitle(`❌ SALAH! | ${user.username.toUpperCase()}`)
+        .setDescription(`Kata **${word.toUpperCase()}** tidak valid!\n**Alasan:** ${reason}`)
+        .setColor("#FF0054")
+        .addFields(
+            { name: "❌ Alasan", value: `- Huruf awal salah\n- Kata tidak ada di KBBI\n- Kata sudah dipakai\n- Terlalu pendek`, inline: false },
+            { name: "❤️ Sisa Nyawa", value: livesEmoji, inline: false },
+            { name: "⚠️ Info", value: `Kamu masih bisa jawab! Sisa waktu: ${timeLeft}s`, inline: false }
+        );
+
+    return { embeds: [embed] };
+}
+
+export function createEliminatedEmbed(user, finalPoints, correctCount, wrongCount, remainingPlayersStr) {
+    const embed = new EmbedBuilder()
+        .setTitle(`💀 ${user.username.toUpperCase()} DIELIMINASI!`)
+        .setDescription(`Nyawa habis! <@${user.id}> keluar dari permainan.`)
+        .setColor("#333333")
+        .addFields(
+            { name: "📊 Point Akhir", value: `${finalPoints} point`, inline: true },
+            { name: "✅ Benar", value: `${correctCount} kali`, inline: true },
+            { name: "❌ Salah", value: `${wrongCount} kali`, inline: true },
+            { name: "👥 Pemain Tersisa", value: remainingPlayersStr || "Tidak ada", inline: false }
+        );
+
+    return { embeds: [embed] };
+}
+
+export function createGameEndEmbed(level, levelName, winner, players, statsStr) {
+    const embed = new EmbedBuilder()
+        .setTitle(`🏆 GAME SELESAI! | Level ${level} - ${levelName}`)
+        .setDescription(winner ? `🎉 Selamat kepada <@${winner.userId}>!` : "🤝 Permainan berakhir seri!")
+        .setColor("#FFD700");
+
+    players.slice(0, 3).forEach((p, index) => {
+        const medals = ['🥇', '🥈', '🥉'];
+        embed.addFields({ name: `${medals[index]} #${index + 1} ${p.username}`, value: `${p.points} pt | ✅${p.correctAnswers} | ⚡${p.avgResponseTime.toFixed(1)}s avg`, inline: false });
+    });
+
+    embed.addFields(
+        { name: "📊 Statistik Game", value: statsStr, inline: false },
+        { name: "💾 Database", value: "Stats semua pemain telah disimpan!", inline: false }
+    );
+
+    const components = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setLabel("🔄 REMATCH").setStyle(ButtonStyle.Primary).setCustomId("sk_rematch"),
+        new ButtonBuilder().setLabel("📊 STATS").setStyle(ButtonStyle.Secondary).setCustomId("sk_stats")
+    );
+
+    return { embeds: [embed], components: [components] };
+}

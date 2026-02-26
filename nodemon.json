@@ -1,0 +1,12 @@
+{
+    "watch": [
+        "src"
+    ],
+    "ext": "js,json",
+    "ignore": [
+        "src/database/data/*",
+        "pesan.txt",
+        "node_modules"
+    ],
+    "exec": "node src/index.js"
+}
