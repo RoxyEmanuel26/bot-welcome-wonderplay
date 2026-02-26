@@ -41,19 +41,22 @@ export function createTurnEmbed(user, previousWord, suffix, suffixLength, levelC
     return { content: `<@${user.id}>, giliranmu!`, embeds: [embed] };
 }
 
-export function createCorrectEmbed(user, word, responseTime, definition, pointsEarned, totalPoints, activeBonuses) {
+export function createCorrectEmbed(user, word, responseTime, definition, pointsEarned, totalPoints, activeBonuses, multiplier, basePoint, bonusTotal) {
+    const wordLength = word.length;
     const embed = new EmbedBuilder()
         .setTitle(`✅ BENAR! +${pointsEarned} POINT`)
         .setDescription(`<@${user.id}> menjawab **${word.toUpperCase()}** dalam ${responseTime}s!\nDefinisi: *${definition}*`)
         .setColor("#00FF87")
         .addFields(
+            { name: "📏 Kata", value: `${word.toUpperCase()} (${wordLength} huruf)`, inline: true },
+            { name: "🎯 Multiplier", value: `×${multiplier.toFixed(2)} (kata panjang lebih untung!)`, inline: true },
             { name: "⚡ Kecepatan", value: `${responseTime} detik`, inline: true },
-            { name: "💰 Point Didapat", value: `+${pointsEarned} point`, inline: true },
+            { name: "💰 Point Didapat", value: `+${pointsEarned} point (Base: ${basePoint} + Bonus: ${bonusTotal})`, inline: true },
             { name: "📊 Total Point", value: `${totalPoints} point`, inline: true }
         );
 
     if (activeBonuses && activeBonuses.length > 0) {
-        embed.addFields({ name: "🔥 Bonus Aktif", value: activeBonuses.map(b => `${b.name}! +${b.value}`).join(' | '), inline: false });
+        embed.addFields({ name: "🔥 Bonus Aktif", value: activeBonuses.join(' | '), inline: false });
     }
 
     return { embeds: [embed] };

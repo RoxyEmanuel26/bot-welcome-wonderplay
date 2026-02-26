@@ -1,8 +1,9 @@
 import { v4 as uuidv4 } from 'uuid';
 import { ThreadAutoArchiveDuration } from 'discord.js';
 import { validateWord, getRandomStartWord, getWordSuffix, checkWordPrefix } from '../utils/kbbiAPI.js';
-import { calculatePoint, calculateTotalPoints } from '../utils/pointCalculator.js';
+import { calculatePoint } from '../utils/pointCalculator.js';
 import { createLobbyEmbed, createTurnEmbed, createCorrectEmbed, createWrongEmbed, createEliminatedEmbed, createGameEndEmbed } from '../utils/embedBuilder.js';
+import { addSambungKataPoints } from '../utils/pointsManager.js';
 import gameManager from './GameManager.js';
 import GameHistory from '../database/models/GameHistory.js';
 import Player from '../database/models/Player.js';
@@ -314,15 +315,19 @@ export default class SambungKataGame {
         player.totalResponseTime += responseTime;
 
         // Calculate points
-        const basePoint = calculatePoint(this.level, responseTime, this.levelConfig.timeLimit);
-
         const isStreak = player.streak >= 3;
         const isSpeed = responseTime <= (this.levelConfig.timeLimit * 0.2);
         const isComeback = player.wrong > 0 && player.streak === 1; // Simplification of comeback
-        const isRareWord = word.length >= 8;
 
-        const { total, bonuses } = calculateTotalPoints(basePoint, isStreak, isSpeed, isComeback, isRareWord);
-        player.points += total;
+        const pointData = calculatePoint(
+            this.level,
+            responseTime,
+            this.levelConfig.timeLimit,
+            word,
+            { streak: isStreak ? player.streak : 0, isSpeed, isComeback }
+        );
+
+        player.points += pointData.total;
 
         this.usedWords.add(word);
         this.currentWord = word;
@@ -332,9 +337,12 @@ export default class SambungKataGame {
             word,
             responseTime.toFixed(1),
             definition,
-            total,
+            pointData.total,
             player.points,
-            bonuses
+            pointData.breakdown,
+            pointData.multiplier,
+            pointData.base,
+            pointData.bonusTotal
         );
 
         await this.thread.send({ embeds });
@@ -426,7 +434,6 @@ export default class SambungKataGame {
 
             // Update Player Stats
             for (const [userId, stats] of this.players.entries()) {
-                const avgResp = stats.correct > 0 ? stats.totalResponseTime / stats.correct : 0;
                 const isWinner = userId === winnerId;
 
                 await Player.findOneAndUpdate(
@@ -452,12 +459,40 @@ export default class SambungKataGame {
                     },
                     { upsert: true }
                 );
-
-                // For avgResponseTime, we need a slight workaround to update a moving average or just store the most recent.
-                // Or pull and compute... since it's just general info, we update it via a find then save if necessary,
-                // but for now keeping it simple. We can use $set or skip it inside $inc to avoid complex moving average code.
-                /* We could do an aggregation pipeline update if needed. */
             }
+
+            // Save to shared database
+            const savePromises = ranking.map((player, i) => {
+                const rank = i + 1;
+                const winnerBonus = rank === 1 ? 10 : 0;
+                const totalPoints = player.points + winnerBonus;
+
+                return addSambungKataPoints(
+                    this.guildId,
+                    player.userId,
+                    player.username,
+                    totalPoints,
+                    {
+                        level: this.level,
+                        correctAnswers: player.correctAnswers,
+                        wrongAnswers: player.wrongAnswers,
+                        avgResponseTime: player.avgResponseTime,
+                        streak: this.players.get(player.userId).longestStreak,
+                        bonuses: [] // Bonuses array, can get from game event log if stored. Using [] per spec snippet flexibility
+                    },
+                    rank === 1
+                );
+            });
+
+            const saveResults = await Promise.allSettled(savePromises);
+            const failed = saveResults.filter(r => r.status === 'rejected');
+
+            if (failed.length > 0) {
+                console.error(`❌ ${failed.length} player points failed to save`);
+            }
+
+            console.log(`✅ Game ${this.gameId} - Points saved to shared DB!`);
+
         } catch (error) {
             console.error('❌ Error saving game stats:', error);
         }

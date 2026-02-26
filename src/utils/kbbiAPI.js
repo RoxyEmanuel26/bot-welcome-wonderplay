@@ -86,15 +86,50 @@ export async function validateWord(word) {
 }
 
 export function getRandomStartWord(level) {
-    const wordsByLevel = {
-        1: ['bola', 'makan', 'nasi', 'ikan', 'ayam', 'buku', 'meja', 'kursi', 'rumah', 'pohon'],
-        2: ['makan', 'rumah', 'bunga', 'pohon', 'langit', 'angin', 'hujan', 'pasar', 'kota', 'desa'],
-        3: ['sekolah', 'kantor', 'sungai', 'danau', 'gunung', 'pantai', 'taman', 'pakaian', 'makanan'],
-        4: ['pelajaran', 'perjalanan', 'kehidupan', 'pemerintah', 'perusahaan', 'lingkungan'],
-        5: ['pengetahuan', 'pembangunan', 'keberhasilan', 'permasalahan', 'ketidakpastian']
+    // Ambil dari .env sesuai level
+    const envKeys = {
+        1: process.env.SK_STARTER_L1,
+        2: process.env.SK_STARTER_L2,
+        3: process.env.SK_STARTER_L3,
+        4: process.env.SK_STARTER_L4,
+        5: process.env.SK_STARTER_L5
     };
-    const words = wordsByLevel[level] || wordsByLevel[1];
-    return words[Math.floor(Math.random() * words.length)];
+
+    const envValue = envKeys[level];
+
+    // Fallback hardcoded jika .env tidak diset
+    const fallback = {
+        1: ['bola', 'makan', 'nasi', 'ikan', 'ayam', 'buku', 'meja', 'kursi'],
+        2: ['makan', 'rumah', 'bunga', 'pohon', 'langit', 'angin', 'hujan'],
+        3: ['sekolah', 'kantor', 'sungai', 'danau', 'gunung', 'pantai'],
+        4: ['pelajaran', 'perjalanan', 'kehidupan', 'pemerintah'],
+        5: ['pengetahuan', 'pembangunan', 'keberhasilan', 'permasalahan']
+    };
+
+    let words;
+
+    if (envValue && envValue.trim().length > 0) {
+        // Parse dari .env (split koma, trim spasi, filter kosong)
+        words = envValue
+            .split(',')
+            .map(w => w.trim().toLowerCase())
+            .filter(w => w.length > 0);
+
+        if (words.length === 0) {
+            console.warn(`⚠️ SK_STARTER_L${level} kosong di .env, pakai fallback`);
+            words = fallback[level];
+        } else {
+            console.log(`📋 SK_STARTER_L${level}: ${words.length} kata tersedia dari .env`);
+        }
+    } else {
+        console.warn(`⚠️ SK_STARTER_L${level} tidak diset di .env, pakai fallback`);
+        words = fallback[level];
+    }
+
+    // Ambil random dari list
+    const picked = words[Math.floor(Math.random() * words.length)];
+    console.log(`🎲 Starter word Level ${level}: "${picked}"`);
+    return picked;
 }
 
 export function getWordSuffix(word, count) {
