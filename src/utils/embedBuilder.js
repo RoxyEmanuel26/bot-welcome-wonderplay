@@ -41,23 +41,44 @@ export function createTurnEmbed(user, previousWord, suffix, suffixLength, levelC
     return { content: `<@${user.id}>, giliranmu!`, embeds: [embed] };
 }
 
-export function createCorrectEmbed(user, word, responseTime, definition, pointsEarned, totalPoints, activeBonuses, multiplier, basePoint, bonusTotal) {
-    const wordLength = word.length;
+export function createCorrectEmbed(user, word, definition, pointResult, totalPoints, feedback) {
     const embed = new EmbedBuilder()
-        .setTitle(`✅ BENAR! +${pointsEarned} POINT`)
-        .setDescription(`<@${user.id}> menjawab **${word.toUpperCase()}** dalam ${responseTime}s!\nDefinisi: *${definition}*`)
+        .setTitle(`✅ BENAR! +${pointResult.total} POINT`)
+        .setDescription(`<@${user.id}> menjawab **${word.toUpperCase()}** dalam ${pointResult.responseTime.toFixed(1)}s!\nDefinisi: *${definition}*`)
         .setColor("#00FF87")
         .addFields(
-            { name: "📏 Kata", value: `${word.toUpperCase()} (${wordLength} huruf)`, inline: true },
-            { name: "🎯 Multiplier", value: `×${multiplier.toFixed(2)} (kata panjang lebih untung!)`, inline: true },
-            { name: "⚡ Kecepatan", value: `${responseTime} detik`, inline: true },
-            { name: "💰 Point Didapat", value: `+${pointsEarned} point (Base: ${basePoint} + Bonus: ${bonusTotal})`, inline: true },
-            { name: "📊 Total Point", value: `${totalPoints} point`, inline: true }
+            {
+                name: '📏 Panjang Kata',
+                value: `**${word.toUpperCase()}** — ${word.length} huruf ${pointResult.multiplierText}`,
+                inline: true
+            },
+            {
+                name: '⏱️ Kecepatan',
+                value: `${pointResult.responseTime.toFixed(1)} detik`,
+                inline: true
+            },
+            {
+                name: '💰 Point Didapat',
+                value: `**+${pointResult.total} pt**\nBase: ${pointResult.base} + Bonus: ${pointResult.bonusTotal}`,
+                inline: true
+            }
         );
 
-    if (activeBonuses && activeBonuses.length > 0) {
-        embed.addFields({ name: "🔥 Bonus Aktif", value: activeBonuses.join(' | '), inline: false });
+    // Tampilkan breakdown bonus jika ada
+    if (pointResult.bonuses && pointResult.bonuses.length > 0) {
+        embed.addFields({
+            name: '🎁 Bonus Aktif',
+            value: pointResult.bonuses.map(b => `${b.icon} ${b.name} +${b.value}`).join('\n'),
+            inline: false
+        });
     }
+
+    // Feedback panjang kata
+    embed.addFields({
+        name: '💡 Info',
+        value: feedback,
+        inline: false
+    });
 
     return { embeds: [embed] };
 }

@@ -1,3 +1,5 @@
+import { getMultiplier, LEVELS } from '../games/LevelConfig.js';
+
 // Helper: ambil nilai number dari .env dengan fallback
 function envNum(key, fallback) {
     const val = process.env[key];
@@ -5,17 +7,9 @@ function envNum(key, fallback) {
     return (!val || isNaN(num)) ? fallback : num;
 }
 
-// Ambil konfigurasi dari .env dengan fallback default
-export function getLevelConfig() {
+// Ambil konfigurasi bonus dari .env
+export function getBonusConfig() {
     return {
-        maxPoints: {
-            1: envNum('SK_MAX_POINT_L1', 5),
-            2: envNum('SK_MAX_POINT_L2', 8),
-            3: envNum('SK_MAX_POINT_L3', 10),
-            4: envNum('SK_MAX_POINT_L4', 12),
-            5: envNum('SK_MAX_POINT_L5', 15)
-        },
-        minPointRatio: envNum('SK_MIN_POINT_RATIO', 0.20),
         bonusStreak: envNum('SK_BONUS_STREAK', 2),
         bonusSpeed: envNum('SK_BONUS_SPEED', 2),
         bonusComeback: envNum('SK_BONUS_COMEBACK', 1),
@@ -28,91 +22,102 @@ export function getLevelConfig() {
 }
 
 /**
- * Hitung multiplier berdasarkan panjang kata
- * @param {number} wordLength - Panjang kata jawaban
- * @returns {number} multiplier (0.5 - 1.5)
- */
-export function getWordLengthMultiplier(wordLength) {
-    if (wordLength <= 3) return 0.50;
-    if (wordLength === 4) return 0.65;
-    if (wordLength === 5) return 0.80;
-    if (wordLength === 6) return 0.90;
-    if (wordLength === 7) return 1.00;  // baseline
-    if (wordLength === 8) return 1.10;
-    if (wordLength === 9) return 1.20;
-    if (wordLength === 10) return 1.30;
-    return 1.50;  // 11+ huruf
-}
-
-/**
- * Kalkulasi point lengkap berdasarkan:
- * - Waktu jawab (semakin cepat = semakin banyak)
- * - Panjang kata (semakin panjang = max point lebih tinggi)
- * - Bonus yang aktif
+ * Kalkulasi point berdasarkan:
+ *   - Level game (menentukan max base point dan time limit)
+ *   - Waktu jawab (semakin cepat = semakin besar point)
+ *   - Panjang kata jawaban (semakin panjang = multiplier lebih tinggi)
  *
- * @param {number} level          - Level game (1-5)
- * @param {number} responseTimeSec - Waktu jawab dalam detik
- * @param {number} timeLimit      - Batas waktu level (detik)
- * @param {string} word           - Kata yang dijawab
- * @param {object} bonuses        - { streak, isSpeed, isComeback }
- * @returns {object} { base, multiplier, bonusTotal, total, breakdown }
+ * TIDAK ADA batasan minimal/maksimal panjang kata.
+ * Kata pendek = multiplier kecil tapi tetap VALID.
+ * Kata panjang = multiplier besar = reward lebih banyak.
+ *
+ * @param {number} level            - Level game (1-5)
+ * @param {number} responseTimeSec  - Waktu jawab dalam detik
+ * @param {number} timeLimit        - Batas waktu level (detik)
+ * @param {string} word             - Kata jawaban user
+ * @param {object} bonuses          - { streak, isSpeed, isComeback }
+ * @returns {object} hasil kalkulasi lengkap
  */
-export function calculatePoint(level, responseTimeSec, timeLimit, word, bonuses = {}) {
-    const config = getLevelConfig();
-    const maxBase = config.maxPoints[level];
-    const minPoint = Math.max(1, Math.floor(maxBase * config.minPointRatio));
+export function calculatePoint(level, responseTimeSec, timeLimit, word = '', bonuses = {}) {
+    const config = getBonusConfig();
+    const levelCfg = LEVELS[level];
+    const maxBase = envNum(`SK_MAX_POINT_L${level}`, levelCfg?.maxPoint ?? 10);
+    const minPoint = Math.max(1, Math.floor(maxBase * envNum('SK_MIN_POINT_RATIO', 0.20)));
 
-    // 1. MULTIPLIER BERDASARKAN PANJANG KATA
+    // ── 1. MULTIPLIER BERDASARKAN PANJANG KATA ──────────────────
     const wordLength = word.length;
-    const multiplier = getWordLengthMultiplier(wordLength);
+    const multiplier = getMultiplier(wordLength);
     const adjustedMax = Math.ceil(maxBase * multiplier);
 
-    // 2. BASE POINT BERDASARKAN KECEPATAN
-    //    Semakin cepat jawab = semakin mendekati adjustedMax
-    const timeRatio = 1 - (responseTimeSec / timeLimit);
-    const basePoint = Math.max(minPoint, Math.round(adjustedMax * timeRatio));
+    // ── 2. BASE POINT BERDASARKAN KECEPATAN ─────────────────────
+    //   ratio mendekati 1.0 = jawab sangat cepat = point besar
+    //   ratio mendekati 0.0 = jawab di detik terakhir = point kecil
+    const safeTime = Math.min(responseTimeSec, timeLimit); // clamp
+    const ratio = Math.max(0, 1 - (safeTime / timeLimit));
+    const basePoint = Math.max(minPoint, Math.round(adjustedMax * ratio));
 
-    // 3. BONUS POINT
+    // ── 3. BONUS POINT ───────────────────────────────────────────
     let bonusTotal = 0;
     const bonusBreakdown = [];
 
-    // Streak bonus
+    // Streak bonus: jawab benar X kali berturut-turut
     if (bonuses.streak && bonuses.streak >= config.streakThreshold) {
         bonusTotal += config.bonusStreak;
-        bonusBreakdown.push(`🔥 STREAK x${bonuses.streak} +${config.bonusStreak}`);
+        bonusBreakdown.push({ name: 'STREAK', value: config.bonusStreak, icon: '🔥' });
     }
 
-    // Speed bonus (jawab dalam threshold% pertama waktu)
+    // Speed bonus: jawab dalam X% pertama waktu
     if (responseTimeSec <= timeLimit * config.speedThreshold) {
         bonusTotal += config.bonusSpeed;
-        bonusBreakdown.push(`⚡ SPEED +${config.bonusSpeed}`);
+        bonusBreakdown.push({ name: 'SPEED', value: config.bonusSpeed, icon: '⚡' });
     }
 
-    // Comeback bonus
+    // Comeback bonus: jawab benar setelah salah
     if (bonuses.isComeback) {
         bonusTotal += config.bonusComeback;
-        bonusBreakdown.push(`💪 COMEBACK +${config.bonusComeback}`);
+        bonusBreakdown.push({ name: 'COMEBACK', value: config.bonusComeback, icon: '💪' });
     }
 
-    // Kata langka bonus (berdasarkan config)
+    // Kata langka bonus: panjang kata >= threshold di .env
     if (wordLength >= config.rareWordLength) {
         bonusTotal += config.bonusRareWord;
-        bonusBreakdown.push(`📚 KATA LANGKA (${wordLength} huruf) +${config.bonusRareWord}`);
+        bonusBreakdown.push({ name: `KATA LANGKA (${wordLength} huruf)`, value: config.bonusRareWord, icon: '📚' });
     }
 
-    // 4. TOTAL
+    // ── 4. TOTAL ─────────────────────────────────────────────────
     const total = basePoint + bonusTotal;
 
-    // 5. RETURN BREAKDOWN LENGKAP
+    // ── 5. RETURN OBJECT LENGKAP ─────────────────────────────────
     return {
+        // Nilai utama
         base: basePoint,
-        multiplier: multiplier,
-        adjustedMax: adjustedMax,
-        wordLength: wordLength,
         bonusTotal: bonusTotal,
         total: total,
-        breakdown: bonusBreakdown,
+
+        // Info kalkulasi (untuk embed/log)
+        wordLength: wordLength,
+        multiplier: multiplier,
+        adjustedMax: adjustedMax,
         responseTime: responseTimeSec,
-        detail: `${wordLength} huruf (×${multiplier}) | ${responseTimeSec.toFixed(1)}s | Base: ${basePoint} + Bonus: ${bonusTotal} = ${total}pt`
+        bonuses: bonusBreakdown,
+
+        // String info siap pakai
+        multiplierText: multiplier >= 1.0
+            ? `×${multiplier.toFixed(2)} 🔺`
+            : `×${multiplier.toFixed(2)} 🔻`,
+        detail: `${wordLength} huruf ×${multiplier.toFixed(2)} | ${responseTimeSec.toFixed(1)}s | Base: ${basePoint} + Bonus: ${bonusTotal} = ${total}pt`
     };
+}
+
+// Fungsi lama tetap ada tapi deprecated (backward compat)
+export function calculateTotalPoints(basePoint, isStreak, isSpeed, isComeback, isRareWord) {
+    const config = getBonusConfig();
+    let total = basePoint;
+    let bonuses = [];
+    if (isStreak) { total += config.bonusStreak; bonuses.push({ name: 'STREAK', value: config.bonusStreak }); }
+    if (isSpeed) { total += config.bonusSpeed; bonuses.push({ name: 'SPEED', value: config.bonusSpeed }); }
+    if (isComeback) { total += config.bonusComeback; bonuses.push({ name: 'COMEBACK', value: config.bonusComeback }); }
+    if (isRareWord) { total += config.bonusRareWord; bonuses.push({ name: 'KATA LANGKA', value: config.bonusRareWord }); }
+    return { total, bonuses };
+    // ⚠️ DEPRECATED - gunakan calculatePoint() yang baru!
 }

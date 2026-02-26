@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { ThreadAutoArchiveDuration } from 'discord.js';
 import { validateWord, getRandomStartWord, getWordSuffix, checkWordPrefix } from '../utils/kbbiAPI.js';
 import { calculatePoint } from '../utils/pointCalculator.js';
+import { getLengthFeedback } from './LevelConfig.js';
 import { createLobbyEmbed, createTurnEmbed, createCorrectEmbed, createWrongEmbed, createEliminatedEmbed, createGameEndEmbed } from '../utils/embedBuilder.js';
 import { addSambungKataPoints } from '../utils/pointsManager.js';
 import gameManager from './GameManager.js';
@@ -257,13 +258,7 @@ export default class SambungKataGame {
             return;
         }
 
-        // 3. Cek panjang kata
-        if (word.length < this.levelConfig.minWordLength) {
-            await this.handleWrong(userId, word, `Minimal panjang kata untuk level ini adalah ${this.levelConfig.minWordLength} huruf`);
-            return;
-        }
-
-        // 4. Cek apakah kata sudah dipakai
+        // 3. Cek apakah kata sudah dipakai
         if (this.usedWords.has(word)) {
             await this.handleWrong(userId, word, "Kata ini sudah digunakan dalam game ini!");
             return;
