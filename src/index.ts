@@ -5,7 +5,7 @@
 import dotenv from 'dotenv';
 dotenv.config({ path: './config/.env' });
 
-import { Client, GatewayIntentBits, Partials, Collection, REST, Routes, Interaction, ChatInputCommandInteraction, ButtonInteraction } from 'discord.js';
+import { Client, GatewayIntentBits, Partials, Collection, Interaction, Events } from 'discord.js';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { readdirSync } from 'fs';
@@ -62,14 +62,14 @@ for (const file of commandFiles) {
                 client.commands.set(alias, cmd);
             });
         }
-        console.log(`✅ Loaded command: !${cmd.name}`);
+        // console.log(`✅ Loaded command: !${cmd.name}`);
     }
 
     // Load slash commands
     if (cmd.data) {
         client.slashCommands.set(cmd.data.name, cmd);
         slashCommandsData.push(cmd.data.toJSON());
-        console.log(`✅ Loaded slash command: /${cmd.data.name}`);
+        // console.log(`✅ Loaded slash command: /${cmd.data.name}`);
     }
 }
 
@@ -82,14 +82,14 @@ const eventFiles = readdirSync(eventsPath).filter(file => file.endsWith('.ts') |
 
 for (const file of eventFiles) {
     const event = await import(`./events/${file}`);
-    const eventName = file.split('.')[0];
+    const eventName = event.default.name || file.split('.')[0];
 
     if (event.default.once) {
         client.once(eventName, (...args) => event.default.execute(...args, client));
     } else {
         client.on(eventName, (...args) => event.default.execute(...args, client));
     }
-    console.log(`✅ Loaded event: ${eventName}`);
+    // console.log(`✅ Loaded event: ${eventName === 'ready' ? 'clientReady' : eventName.toString()}`);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -160,7 +160,7 @@ client.on('interactionCreate', async (interaction: Interaction) => {
 // 🚀 BOT READY & REGISTER SLASH COMMANDS
 // ═══════════════════════════════════════════════════════════════
 
-client.once('ready', async () => {
+client.once(Events.ClientReady, async () => {
     console.log('\n═══════════════════════════════════════════════════════════');
     console.log(`✅ Bot online sebagai ${client.user?.tag || 'Unknown'}`);
     console.log(`📊 Loaded ${client.commands.size} prefix commands`);

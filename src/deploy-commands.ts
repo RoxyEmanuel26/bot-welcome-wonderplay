@@ -29,7 +29,7 @@ for (const file of commandFiles) {
 
     if (cmd.data) {
         commands.push(cmd.data.toJSON());
-        console.log(`✅ Loaded slash command: /${(cmd.data as any).name}`);
+        // console.log(`✅ Loaded slash command: /${(cmd.data as any).name}`);
     }
 }
 

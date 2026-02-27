@@ -6,8 +6,8 @@
   "scripts": {
     "start": "node dist/index.js",
     "build": "tsc",
-    "dev": "nodemon --watch src -e ts --exec \"node --loader ts-node/esm\" src/index.ts",
-    "deploy": "node --loader ts-node/esm src/deploy-commands.ts",
+    "dev": "tsx watch src/index.ts",
+    "deploy": "tsx src/deploy-commands.ts",
     "deploy:prod": "node dist/deploy-commands.js"
   },
   "dependencies": {
@@ -23,8 +23,7 @@
   "devDependencies": {
     "@types/node": "^25.3.2",
     "@types/uuid": "^10.0.0",
-    "nodemon": "^3.1.14",
-    "ts-node": "^10.9.2",
+    "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   }
 }

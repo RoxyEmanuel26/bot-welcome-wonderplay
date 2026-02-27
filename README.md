@@ -1,16 +1,15 @@
-# 🎮 Wonderplay Welcome Bot
+# 🎮 Wonderplay Welcome Bot v3.5 (TypeScript Edition)
 
-Bot Discord multifungsi yang powerful, dibangun dengan **Clean Architecture** menggunakan **Discord.js v14**. Bot ini menyambut member baru dengan pesan dinamis, gambar Canvas, AI Gemini, dan dilengkapi fitur **Valorant Team Roulette** untuk pembagian tim otomatis!
+Bot Discord multifungsi yang powerful, dibangun dengan **Clean Architecture (TypeScript)** menggunakan **Discord.js v14** dan **MongoDB**. Bot ini dilengkapi game seru (Sambung Kata, Quiz) dan **Valorant Team Roulette** untuk pembagian tim otomatis!
 
 ---
 
 ## ✨ Fitur Utama
 
-### 1. 👋 Welcome System
+### 1. 👋 Welcome System (Instan)
 Menyambut member baru secara otomatis ketika bergabung ke server.
 - Pesan welcome dari **2000+ template** di `pesan.txt`
 - **Canvas Welcome Image** — Banner keren dengan avatar, nama, dan nomor member
-- **AI Gemini** — Generate ucapan unik dan lucu secara otomatis
 - **Rich Embed** — Tampilan kotak berwarna yang profesional
 - **Hot Reload** — Edit `pesan.txt` tanpa restart bot
 
@@ -20,22 +19,21 @@ Mengirimkan pesan perpisahan otomatis saat member meninggalkan server.
 ### 3. 🛡️ Auto-Role
 Secara otomatis memberikan Role kepada member baru yang bergabung.
 
-### 4. 🎯 Valorant Team Roulette
+### 4. 🎮 Discord Games terintegrasi MongoDB
+- **Sambung Kata**: Game interaktif berbatas waktu dengan nyawa (lives) dan skor otomatis tersimpan di Database MongoDB (Shared DB).
+- **Leaderboard Global/Seminggu/Sebulan**: Sistem poin terpadu.
+
+### 5. 🎯 Valorant Team Roulette
 Fitur terkeren! Membagi tim Valorant secara acak langsung dari voice channel.
 - Deteksi otomatis siapa saja yang ada di voice channel
 - Pembagian tim **Attackers vs Defenders** secara random
-- Bisa **exclude** player yang tidak ikut main
-- **Random Map** dari 12 map Valorant (Bind, Haven, Split, Ascent, Icebox, Breeze, Fracture, Pearl, Lotus, Sunset, Abyss, Corrode) lengkap dengan gambar
+- **Random Map** dari 12 map Valorant lengkap dengan gambar
 - **Tombol Re-Roll** interaktif (Re-Roll Team / Map / Semua)
-- **Match History** tercatat otomatis
-- Jika jumlah ganjil → 1 orang jadi Spectator
 
-### 5. 📊 Server Stats (Always-On)
-Statistik bot yang selalu menyala dan sinkron dengan server Discord secara real-time.
-- Total Members (live sync)
-- Total Welcomes sent
-- Messages Pool
-- Last Welcome timestamp
+### 6. 📊 Server Stats (Always-On) & Auto-Reconnect DB
+- Statistik bot yang menyala dan sinkron secara real-time.
+- **Sistem Resilient**: MongoDB akan otomatis reconnect maksimum 10x percobaan jika koneksi tiba-tiba terputus dari *cloud*.
+- **Graceful Shutdown**: Pembersihan memori otomatis (game di-cancel) jika bot direstart mendadak.
 
 ---
 
@@ -50,25 +48,26 @@ Statistik bot yang selalu menyala dan sinkron dengan server Discord secara real-
 | `!stats` | Administrator | Lihat statistik bot |
 | `?fitur` | Semua Member | Menampilkan menu bantuan dan semua command bot |
 | `?roulettevoice` | Semua Member | Acak pembagian tim Valorant dari voice |
-| `?roulettevoice @user1 @user2` | Semua Member | Acak tim, exclude user yang di-tag |
 | `?testroulettevoice` | Administrator | Test roulette dengan dummy data |
-| `?testroulettevoice 6` | Administrator | Test roulette dengan jumlah pemain tertentu |
 
 ### Slash Commands (`/`)
 
 | Command | Permission | Deskripsi |
 |---------|-----------|-----------|
 | `/welcome @user` | Manage Guild | Kirim welcome message ke user tertentu |
+| `/sk` | Semua Member | Mulai permainan Sambung Kata |
+| `/skstats` | Semua Member | Menampilkan profil stat pemain |
+| `/sktop` | Semua Member | Menampilkan Leaderboard Poin Global |
 
 ---
 
 ## 🛠️ Tech Stack
 
-- [Node.js](https://nodejs.org/) (v16.0.0+)
+- **[TypeScript 5+](https://www.typescriptlang.org/)** (Strict Mode Enabled)
+- [Node.js](https://nodejs.org/) (v18.0.0+)
 - [Discord.js v14](https://discord.js.org/)
+- [Mongoose](https://mongoosejs.com/) — MongoDB ODM
 - [Canvas](https://www.npmjs.com/package/canvas) — Generate welcome images
-- [@google/generative-ai](https://www.npmjs.com/package/@google/generative-ai) — AI welcome messages
-- [dotenv](https://www.npmjs.com/package/dotenv) — Environment variables
 
 ---
 
@@ -76,9 +75,9 @@ Statistik bot yang selalu menyala dan sinkron dengan server Discord secara real-
 
 ### Prerequisites
 
-- **Node.js 16.0.0+** — [Download di sini](https://nodejs.org/)
+- **Node.js 18.0.0+** — [Download di sini](https://nodejs.org/)
+- **MongoDB Cluster** — URL `mongodb+srv://...`
 - **Discord Bot Token** — [Buat di Discord Developer Portal](https://discord.com/developers/applications)
-- **Gemini API Key** *(opsional)* — [Dapatkan di Google AI Studio](https://aistudio.google.com/)
 
 ### Installation
 
@@ -99,40 +98,26 @@ Statistik bot yang selalu menyala dan sinkron dengan server Discord secara real-
    cp config/.env.example config/.env
    ```
 
-   Edit file `config/.env`:
-   ```env
-   DISCORD_TOKEN=your_discord_bot_token_here
-   OPENAI_API_KEY=your_openai_api_key_here
-   WELCOME_CHANNEL_ID=your_welcome_channel_id_here
-   GEMINI_API_KEY=your_google_gemini_api_key_here
+4. **Kompilasi TypeScript:**
+   ```bash
+   npm run build
+   ```
 
-   # ======== PENGATURAN MODUL BOT ========
-   FITUR_WELCOME=on
-   FITUR_GOODBYE=on
-   FITUR_ROULETTE=on
-
-   # ==== PENGATURAN TAMPILAN WELCOME ====
-   USE_EMBED=on
-   USE_CANVAS_IMAGE=on
-   USE_GEMINI_AI=on
-
-   # ========= FITUR AUTO ROLE =========
-   FITUR_AUTO_ROLE=off
-   AUTO_ROLE_ID=masukkan_discord_role_id_member_disini
-
-   # Bot Owners (Discord User ID, pisah pakai koma)
-   BOT_OWNERS=your_discord_user_id_here
+5. **Daftarkan Slash Command Pertama Kali:**
+   ```bash
+   npm run deploy
    ```
 
 ### Running the Bot
 
-**Development (auto-restart):**
+**Development (auto-restart by tsx):**
 ```bash
 npm run dev
 ```
 
 **Production:**
 ```bash
+npm run deploy:prod  # Opsional: Jika command berubah
 npm start
 ```
 
@@ -144,13 +129,13 @@ Semua fitur bisa dinyalakan atau dimatikan melalui file `config/.env`:
 
 | Variabel | Fungsi | Default |
 |----------|--------|---------|
+| `MONGODB_URI` | Alamat Cluster Database MongoDB | *(wajib)* |
+| `CLIENT_ID` | Application/Client ID Bot Anda | *(wajib)* |
 | `FITUR_WELCOME` | Pesan welcome otomatis saat member join | `on` |
 | `FITUR_GOODBYE` | Pesan goodbye otomatis saat member leave | `on` |
 | `FITUR_ROULETTE` | Fitur Valorant Team Roulette | `on` |
 | `USE_EMBED` | Kirim pesan dalam format Rich Embed | `on` |
 | `USE_CANVAS_IMAGE` | Generate gambar welcome dengan Canvas | `on` |
-| `USE_GEMINI_AI` | AI-generated welcome messages | `on` |
-| `FITUR_AUTO_ROLE` | Beri role otomatis ke member baru | `off` |
 
 ---
 
@@ -163,33 +148,19 @@ bot-welcome-wonderplay/
 │   ├── .env                 # Environment variables (RAHASIA)
 │   └── .env.example         # Template konfigurasi
 ├── src/
-│   ├── commands/
-│   │   ├── rouletteVoice.js      # ?roulettevoice command
-│   │   ├── testRouletteVoice.js  # ?testroulettevoice (admin test)
-│   │   ├── fitur.js              # ?fitur command (help/menu)
-│   │   ├── stats.js              # !stats command
-│   │   ├── welcome.js            # /welcome slash command
-│   │   ├── welcomePrefix.js      # !welcome prefix command
-│   │   └── welc.js               # !welc test command
-│   ├── events/
-│   │   ├── ready.js              # Bot startup event
-│   │   ├── guildMemberAdd.js     # Member join event
-│   │   └── guildMemberRemove.js  # Member leave event
-│   ├── utils/
-│   │   ├── welcomeHandler.js     # Welcome message handler
-│   │   ├── canvasBuilder.js      # Canvas image generator
-│   │   ├── aiGenerator.js        # Gemini AI message generator
-│   │   ├── messageLoader.js      # Template message loader
-│   │   ├── statsManager.js       # Statistics manager
-│   │   ├── matchHistory.js       # Match history tracker
-│   │   ├── valorantMaps.js       # Valorant maps & team splitter
-│   │   └── permissions.js        # Permission checker
-│   └── index.js                  # Main entry point
+│   ├── commands/            # Seluruh command Prefix (.ts) & Slash commands
+│   ├── database/
+│   │   ├── models/          # Mongoose Schema Collections
+│   │   └── connection.ts    # Auto-Reconnect DB Logic
+│   ├── events/              # Event system (ready, messageCreate, etc)
+│   ├── games/               # Logika sistem game (Sambung Kata)
+│   ├── types/               # Type Definition kustom TypeScript
+│   ├── utils/               # Modul generator dan handler pembantu 
+│   ├── deploy-commands.ts   # Script Pendaftaran Slash Command
+│   └── index.ts             # Main entry point bot
 ├── pesan.txt                # 2000+ template welcome messages
-├── stats.json               # Bot statistics data
-├── match_history.json       # Roulette match history
+├── tsconfig.json            # Konfigurasi TypeScript Compiler Strict
 ├── package.json
-├── .gitignore
 └── README.md
 ```
 

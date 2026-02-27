@@ -13,22 +13,24 @@ export default {
         // Cek apakah user adalah owner
         const owners = process.env.BOT_OWNERS?.split(',') || [];
         if (!owners.includes(message.author.id)) {
-            return message.reply('❌ Command ini hanya bisa digunakan oleh Owner Bot!');
+            return message.reply('❌ **Akses Ditolak!** Command ini hanya bisa digunakan oleh Owner Bot.');
         }
 
-        const reply = await message.reply('🔄 Sedang mendaftarkan slash commands... Mohon tunggu.');
+        const reply = await message.reply('🔄 Sedang mengeksekusi script `npm run deploy` di background... Mohon tunggu.');
 
         try {
-            // Jalankan script deploy via exec
-            const { stdout, stderr } = await execPromise('npm run deploy');
+            // Jalankan script deploy via exec dengan timeout 15 detik agar gak stuck
+            const { stdout, stderr } = await execPromise('npm run deploy', { timeout: 15000 });
 
+            console.log('--- Deploy Log ---');
             console.log(stdout);
             if (stderr) console.error(stderr);
+            console.log('------------------');
 
-            await reply.edit('✅ Berhasil mendaftarkan slash commands!\nℹ️ *Perubahan mungkin butuh beberapa menit / restart aplikasi Discord untuk muncul (cache Discord).*');
+            await reply.edit('✅ **Berhasil!** Script deployment (*npm run deploy*) telah dieksekusi.\nℹ️ *Seluruh slash command terbaru sudah dicatatkan ke API Discord. Perubahan mungkin butuh beberapa saat / restart aplikasi Discord untuk muncul (tergantung cache Discord).*');
         } catch (error: any) {
             console.error('Deploy error:', error);
-            await reply.edit(`❌ Terjadi kesalahan saat mendaftarkan commands:\n\`\`\`\n${error.message}\n\`\`\``);
+            await reply.edit(`❌ **Gagal mengeksekusi script.** Terjadi error pada terminal server/host:\n\`\`\`\n${error.message}\n\`\`\``);
         }
     }
 };

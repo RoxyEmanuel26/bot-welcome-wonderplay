@@ -1,10 +1,10 @@
-import { Client } from 'discord.js';
+import { Client, Events } from 'discord.js';
 import { loadMessages, setupHotReload, getMessagesCount } from '../utils/messageLoader.js';
 import { loadStats, getStats } from '../utils/statsManager.js';
 import { loadMatchHistory } from '../utils/matchHistory.js';
 
 export default {
-  name: 'ready',
+  name: Events.ClientReady,
   once: true,
   async execute(client: Client) {
     console.log('╔═══════════════════════════════════════════╗');
