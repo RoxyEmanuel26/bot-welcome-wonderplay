@@ -8,7 +8,16 @@ export interface KbbiValidationResult {
     definition: string;
 }
 
+const MEMORY_CACHE_MAX = 1000;
 const memoryCache = new Map<string, KbbiValidationResult>();
+
+function setCacheWithLimit(key: string, value: KbbiValidationResult): void {
+    if (memoryCache.size >= MEMORY_CACHE_MAX) {
+        const firstKey = memoryCache.keys().next().value!;
+        memoryCache.delete(firstKey);
+    }
+    memoryCache.set(key, value);
+}
 
 export async function validateWord(word: string): Promise<KbbiValidationResult> {
     const wordLower = word.toLowerCase().trim();
@@ -25,7 +34,7 @@ export async function validateWord(word: string): Promise<KbbiValidationResult> 
         if (cached) {
             console.log(`🗄️ MongoDB Cache: "${wordLower}"`);
             const result: KbbiValidationResult = { valid: cached.isValid, definition: cached.definition };
-            memoryCache.set(wordLower, result);
+            setCacheWithLimit(wordLower, result);
 
             // Update usage count (fire-and-forget, no await needed)
             WordHistory.updateOne(
@@ -40,52 +49,68 @@ export async function validateWord(word: string): Promise<KbbiValidationResult> 
     }
 
     // 3. Fetch dari KBBI API
+    let response;
     try {
-        const response = await axios.get(
+        response = await axios.get(
             `${KBBI_BASE_URL}/entry/${encodeURIComponent(wordLower)}`,
-            { timeout: 3000 }
+            { timeout: 5000 }
         );
-
-        const data = response.data;
-        const isValid = Array.isArray(data.entries) && data.entries.length > 0;
-        const definition = isValid
-            ? (data.entries[0]?.definitions?.[0]?.definition || 'Tidak ada definisi')
-            : '';
-
-        const result: KbbiValidationResult = { valid: isValid, definition };
-
-        // Simpan ke memory cache
-        memoryCache.set(wordLower, result);
-
-        // Simpan ke MongoDB cache (fire-and-forget)
-        WordHistory.create({
-            word: wordLower,
-            isValid,
-            definition,
-            usageCount: 1,
-            lastUsed: new Date()
-        } as any).catch((dbErr: any) => {
-            if (dbErr.code !== 11000) {
-                console.warn('⚠️ MongoDB save failed:', dbErr.message);
-            }
-        });
-
-        console.log(`🔍 KBBI API: "${wordLower}" → ${isValid ? '✅ Valid' : '❌ Invalid'}`);
-        return result;
-
     } catch (error: any) {
         if (error.response?.status === 404) {
             const result: KbbiValidationResult = { valid: false, definition: '' };
-            memoryCache.set(wordLower, result);
+            setCacheWithLimit(wordLower, result);
             console.log(`🔍 KBBI API: "${wordLower}" → ❌ Invalid (404)`);
             return result;
         }
 
-        // API error/timeout → fallback valid
-        console.error(`❌ KBBI API Error: "${wordLower}" →`, error.message);
-        console.warn(`⚠️ FALLBACK: "${wordLower}" dianggap valid (API down)`);
-        return { valid: true, definition: '(tidak dapat diverifikasi - API timeout)' };
+        console.warn(`⚠️ KBBI retry untuk: "${wordLower}"`);
+        await new Promise(r => setTimeout(r, 500));
+
+        try {
+            response = await axios.get(
+                `${KBBI_BASE_URL}/entry/${encodeURIComponent(wordLower)}`,
+                { timeout: 5000 }
+            );
+        } catch (retryError: any) {
+            if (retryError.response?.status === 404) {
+                const result: KbbiValidationResult = { valid: false, definition: '' };
+                setCacheWithLimit(wordLower, result);
+                console.log(`🔍 KBBI API: "${wordLower}" → ❌ Invalid (404)`);
+                return result;
+            }
+
+            console.error(`❌ KBBI tidak dapat dijangkau setelah 2x percobaan: "${wordLower}" →`, retryError.message);
+            console.warn(`⚠️ FALLBACK: "${wordLower}" dianggap valid (API down)`);
+            return { valid: true, definition: '(tidak dapat diverifikasi - API timeout)' };
+        }
     }
+
+    const data = response.data;
+    const isValid = Array.isArray(data.entries) && data.entries.length > 0;
+    const definition = isValid
+        ? (data.entries[0]?.definitions?.[0]?.definition || 'Tidak ada definisi')
+        : '';
+
+    const result: KbbiValidationResult = { valid: isValid, definition };
+
+    // Simpan ke memory cache
+    setCacheWithLimit(wordLower, result);
+
+    // Simpan ke MongoDB cache (fire-and-forget)
+    WordHistory.create({
+        word: wordLower,
+        isValid,
+        definition,
+        usageCount: 1,
+        lastUsed: new Date()
+    } as any).catch((dbErr: any) => {
+        if (dbErr.code !== 11000) {
+            console.warn('⚠️ MongoDB save failed:', dbErr.message);
+        }
+    });
+
+    console.log(`🔍 KBBI API: "${wordLower}" → ${isValid ? '✅ Valid' : '❌ Invalid'}`);
+    return result;
 }
 
 export function getRandomStartWord(level: number | string): string {

@@ -14,11 +14,25 @@ class GameManager {
     public activeGames: Map<string, SambungKataGame>;
     public rematchData: Map<string, RematchData>; // key: message ID
     public threadGames: Map<string, SambungKataGame>; // key: thread ID → fast lookup
+    public lobbyGames: Map<string, SambungKataGame>; // key: lobbyMessageId → game
 
     constructor() {
         this.activeGames = new Map(); // key: guildId_channelId
         this.rematchData = new Map();
         this.threadGames = new Map();
+        this.lobbyGames = new Map();
+    }
+
+    registerLobby(messageId: string, game: SambungKataGame): void {
+        this.lobbyGames.set(messageId, game);
+    }
+
+    unregisterLobby(messageId: string): void {
+        this.lobbyGames.delete(messageId);
+    }
+
+    getGameByLobby(messageId: string): SambungKataGame | null {
+        return this.lobbyGames.get(messageId) || null;
     }
 
     registerThread(threadId: string, game: SambungKataGame): void {
@@ -35,10 +49,10 @@ class GameManager {
 
     storeRematchData(messageId: string, data: RematchData): void {
         this.rematchData.set(messageId, data);
-        // Auto-expire after 20 seconds
+        // Auto-expire after 15 seconds (5s buffer over 10s button disable)
         setTimeout(() => {
             this.rematchData.delete(messageId);
-        }, 10000);
+        }, 15000);
     }
 
     getRematchData(messageId: string): RematchData | undefined {

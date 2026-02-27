@@ -104,9 +104,8 @@ client.on('interactionCreate', async (interaction: Interaction) => {
         const customId = interaction.customId;
 
         if (customId === 'sk_start') {
-            // Handler di-delegate ke lobby/game manager, tapi secara sederhana kita dapat menangani lewat interaction
-            const activeGames = Array.from(gameManager.activeGames.values());
-            const game = (activeGames as any[]).find(g => g.lobbyMessage && g.lobbyMessage.id === interaction.message.id);
+            // Fast O(1) lookup using lobby message ID
+            const game = gameManager.getGameByLobby(interaction.message.id);
             if (game) {
                 if (interaction.user.id !== game.hostId) {
                     return interaction.reply({ content: '❌ Hanya Host yang dapat memulai permainan!', ephemeral: true });
@@ -115,13 +114,12 @@ client.on('interactionCreate', async (interaction: Interaction) => {
                     return interaction.reply({ content: '❌ Minimal butuh 2 pemain untuk memulai!', ephemeral: true });
                 }
                 await interaction.deferUpdate();
-                await game.startGame(interaction.channel);
+                await game.startGame(interaction.channel as any);
             } else {
                 return interaction.reply({ content: '❌ Game tidak ditemukan atau sudah dimulai/berakhir.', ephemeral: true });
             }
         } else if (customId === 'sk_cancel') {
-            const activeGames = Array.from(gameManager.activeGames.values());
-            const game = (activeGames as any[]).find(g => g.lobbyMessage && g.lobbyMessage.id === interaction.message.id);
+            const game = gameManager.getGameByLobby(interaction.message.id);
             if (game) {
                 if (interaction.user.id !== game.hostId) {
                     return interaction.reply({ content: '❌ Hanya Host yang dapat membatalkan permainan!', ephemeral: true });

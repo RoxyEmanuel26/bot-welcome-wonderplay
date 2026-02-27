@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import { ThreadAutoArchiveDuration, GuildMember, TextChannel, Message, ThreadChannel } from 'discord.js';
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ThreadAutoArchiveDuration, GuildMember, TextChannel, Message, ThreadChannel } from 'discord.js';
 import { validateWord, getRandomStartWord, getWordSuffix, checkWordPrefix } from '../utils/kbbiAPI.js';
 import { calculatePoint } from '../utils/pointCalculator.js';
 import { getLengthFeedback, LevelConfig, LEVELS } from './LevelConfig.js';
@@ -40,6 +40,9 @@ export default class SambungKataGame {
     public status: 'lobby' | 'playing' | 'ended';
     private lobbyMessage: Message | null;
     private thread: ThreadChannel | null;
+
+    private isProcessing: boolean = false;
+    private isTimedOut: boolean = false;
 
     private turnStartTime: number;
     private turnTimer: NodeJS.Timeout | null;
@@ -175,6 +178,7 @@ export default class SambungKataGame {
 
             if (!this.lobbyMessage) {
                 this.lobbyMessage = await channel.send({ embeds, components });
+                gameManager.registerLobby(this.lobbyMessage.id, this);
             } else {
                 await this.lobbyMessage.edit({ embeds, components }).catch(() => { });
             }
@@ -184,6 +188,7 @@ export default class SambungKataGame {
                     await this.startGame(channel);
                 } else {
                     await channel.send("❌ Game batal karena kurang pemain (minimal 2).");
+                    if (this.lobbyMessage) gameManager.unregisterLobby(this.lobbyMessage.id);
                     gameManager.endGame(this.guildId, this.channelId);
                 }
             } else {
@@ -198,6 +203,7 @@ export default class SambungKataGame {
     public async startGame(channel: TextChannel): Promise<void> {
         if (this.status !== 'lobby') return;
         if (this.lobbyTimer) clearTimeout(this.lobbyTimer);
+        if (this.lobbyMessage) gameManager.unregisterLobby(this.lobbyMessage.id);
         this.status = 'playing';
 
         // Shuffle player turn
@@ -263,6 +269,9 @@ export default class SambungKataGame {
     }
 
     private async prepareNextTurn(): Promise<void> {
+        this.isProcessing = false;
+        this.isTimedOut = false;
+
         if (this.status !== 'playing' || !this.thread) return;
 
         const alivePlayers = this.getAlivePlayers();
@@ -318,6 +327,9 @@ export default class SambungKataGame {
         const currentId = this.turnOrder[this.currentTurnIndex];
         if (userId !== currentId) return; // Avoid race condition
 
+        if (this.isTimedOut) return;
+        this.isTimedOut = true;
+
         const player = this.players.get(userId);
         if (!player) return;
 
@@ -346,37 +358,44 @@ export default class SambungKataGame {
         // 1. Cek giliran
         if (userId !== currentId) return;
 
-        if (this.turnTimer) clearTimeout(this.turnTimer);
+        if (this.isProcessing) return;
+        this.isProcessing = true;
 
-        const word = message.content.trim().toLowerCase();
+        try {
+            if (this.turnTimer) clearTimeout(this.turnTimer);
 
-        // Cek spasi
-        if (word.includes(' ')) {
-            await this.handleWrong(userId, word, "Hanya boleh 1 kata!");
-            return;
+            const word = message.content.trim().toLowerCase();
+
+            // Cek spasi
+            if (word.includes(' ')) {
+                await this.handleWrong(userId, word, "Hanya boleh 1 kata!");
+                return;
+            }
+
+            // 2. Cek apakah kata diawali dengan suffix yang benar
+            if (!checkWordPrefix(word, this.currentSuffix)) {
+                await this.handleWrong(userId, word, `Kata harus diawali huruf **${this.currentSuffix.toUpperCase()}**`);
+                return;
+            }
+
+            // 3. Cek apakah kata sudah dipakai
+            if (this.usedWords.has(word)) {
+                await this.handleWrong(userId, word, "Kata ini sudah digunakan dalam game ini!");
+                return;
+            }
+
+            // 5. Validasi KBBI
+            const validation = await validateWord(word);
+            if (!validation.valid) {
+                await this.handleWrong(userId, word, "Kata tidak ditemukan di dalam KBBI.");
+                return;
+            }
+
+            // JikA BENAR
+            await this.handleCorrect(userId, word, validation.definition || "Tidak ada definisi.");
+        } finally {
+            this.isProcessing = false;
         }
-
-        // 2. Cek apakah kata diawali dengan suffix yang benar
-        if (!checkWordPrefix(word, this.currentSuffix)) {
-            await this.handleWrong(userId, word, `Kata harus diawali huruf **${this.currentSuffix.toUpperCase()}**`);
-            return;
-        }
-
-        // 3. Cek apakah kata sudah dipakai
-        if (this.usedWords.has(word)) {
-            await this.handleWrong(userId, word, "Kata ini sudah digunakan dalam game ini!");
-            return;
-        }
-
-        // 5. Validasi KBBI
-        const validation = await validateWord(word);
-        if (!validation.valid) {
-            await this.handleWrong(userId, word, "Kata tidak ditemukan di dalam KBBI.");
-            return;
-        }
-
-        // JikA BENAR
-        await this.handleCorrect(userId, word, validation.definition || "Tidak ada definisi.");
     }
 
     private async handleWrong(userId: string, word: string, reason: string): Promise<void> {
@@ -472,6 +491,7 @@ export default class SambungKataGame {
 
         // Unregister thread from fast lookup
         if (this.thread) gameManager.unregisterThread(this.thread.id);
+        if (this.lobbyMessage) gameManager.unregisterLobby(this.lobbyMessage.id);
 
         const alivePlayers = this.getAlivePlayers();
         let winnerId: string | null = null;
@@ -527,9 +547,9 @@ export default class SambungKataGame {
             const msgRef = endMsg;
             setTimeout(async () => {
                 try {
-                    const disabledComponents = new (await import('discord.js')).ActionRowBuilder<any>().addComponents(
-                        new (await import('discord.js')).ButtonBuilder().setLabel('🔄 REMATCH').setStyle(2).setCustomId('sk_rematch').setDisabled(true),
-                        new (await import('discord.js')).ButtonBuilder().setLabel('📊 STATS').setStyle(2).setCustomId('sk_stats')
+                    const disabledComponents = new ActionRowBuilder<any>().addComponents(
+                        new ButtonBuilder().setLabel('🔄 REMATCH').setStyle(2).setCustomId('sk_rematch').setDisabled(true),
+                        new ButtonBuilder().setLabel('📊 STATS').setStyle(2).setCustomId('sk_stats')
                     );
                     await msgRef.edit({ components: [disabledComponents] }).catch(() => { });
                 } catch { }
