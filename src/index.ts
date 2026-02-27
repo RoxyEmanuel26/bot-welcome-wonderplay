@@ -167,21 +167,8 @@ client.once('ready', async () => {
     console.log(`📊 Loaded ${client.slashCommands.size} slash commands`);
     console.log('═══════════════════════════════════════════════════════════\n');
 
-    if (slashCommandsData.length > 0 && process.env.DISCORD_TOKEN) {
-        try {
-            console.log('🔄 Registering slash commands...');
-            const rest = new REST().setToken(process.env.DISCORD_TOKEN);
-            if (client.user) {
-                await rest.put(
-                    Routes.applicationCommands(client.user.id),
-                    { body: slashCommandsData }
-                );
-                console.log('✅ Slash commands registered successfully!\n');
-            }
-        } catch (error) {
-            console.error('❌ Error registering slash commands:', error);
-        }
-    }
+    console.log('ℹ️  Slash commands tidak di-register otomatis.');
+    console.log('ℹ️  Jalankan: npx ts-node src/deploy-commands.ts (jika ada command baru)\n');
 });
 
 // ═══════════════════════════════════════════════════════════════
