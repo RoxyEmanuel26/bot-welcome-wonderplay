@@ -1,7 +1,6 @@
-import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, User } from 'discord.js';
-import { CalculatedPoints } from './pointCalculator.js';
+import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 
-export function createLobbyEmbed(level: number, levelName: string, hostUser: User, levelConfig: any, players: User[], timeLeft: number) {
+export function createLobbyEmbed(level, levelName, hostUser, levelConfig, players, timeLeft) {
     const embed = new EmbedBuilder()
         .setTitle(`🎮 SAMBUNG KATA | Level ${level} - ${levelName}`)
         .setDescription('Sambung kata dari huruf terakhir!\nReply pesan ini untuk JOIN!')
@@ -18,7 +17,7 @@ export function createLobbyEmbed(level: number, levelName: string, hostUser: Use
         )
         .setFooter({ text: "WonderPlay Sambung Kata • Min 2 pemain" });
 
-    const components = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    const components = new ActionRowBuilder().addComponents(
         new ButtonBuilder().setLabel("▶️ MULAI").setStyle(ButtonStyle.Success).setCustomId("sk_start"),
         new ButtonBuilder().setLabel("❌ BATAL").setStyle(ButtonStyle.Danger).setCustomId("sk_cancel")
     );
@@ -26,7 +25,7 @@ export function createLobbyEmbed(level: number, levelName: string, hostUser: Use
     return { embeds: [embed], components: [components] };
 }
 
-export function createTurnEmbed(user: User, previousWord: string, suffix: string, suffixLength: number, levelConfig: any, livesEmoji: string, bonusesStr: string, scoreboardStr: string, usedWordsStr: string) {
+export function createTurnEmbed(user, previousWord, suffix, suffixLength, levelConfig, livesEmoji, bonusesStr, scoreboardStr, usedWordsStr) {
     const embed = new EmbedBuilder()
         .setTitle(`🎯 GILIRAN ${user.username.toUpperCase()}`)
         .setDescription(`Kata sebelumnya: **${previousWord}**\nSambung dengan: **[${suffix.toUpperCase()}]** (${suffixLength} huruf)\n\n⏱️ Kamu punya **${levelConfig.timeLimit} detik** untuk menjawab!`)
@@ -42,7 +41,7 @@ export function createTurnEmbed(user: User, previousWord: string, suffix: string
     return { content: `<@${user.id}>, giliranmu!`, embeds: [embed] };
 }
 
-export function createCorrectEmbed(user: User, word: string, definition: string, pointResult: CalculatedPoints, totalPoints: number, feedback: string) {
+export function createCorrectEmbed(user, word, definition, pointResult, totalPoints, feedback) {
     const embed = new EmbedBuilder()
         .setTitle(`✅ BENAR! +${pointResult.total} POINT`)
         .setDescription(`<@${user.id}> menjawab **${word.toUpperCase()}** dalam ${pointResult.responseTime.toFixed(1)}s!\nDefinisi: *${definition}*`)
@@ -69,7 +68,7 @@ export function createCorrectEmbed(user: User, word: string, definition: string,
     if (pointResult.bonuses && pointResult.bonuses.length > 0) {
         embed.addFields({
             name: '🎁 Bonus Aktif',
-            value: pointResult.bonuses.map((b: any) => `${b.icon} ${b.name} +${b.value}`).join('\n'),
+            value: pointResult.bonuses.map(b => `${b.icon} ${b.name} +${b.value}`).join('\n'),
             inline: false
         });
     }
@@ -84,7 +83,7 @@ export function createCorrectEmbed(user: User, word: string, definition: string,
     return { embeds: [embed] };
 }
 
-export function createWrongEmbed(user: User, word: string, reason: string, livesEmoji: string, timeLeft: number) {
+export function createWrongEmbed(user, word, reason, livesEmoji, timeLeft) {
     const embed = new EmbedBuilder()
         .setTitle(`❌ SALAH! | ${user.username.toUpperCase()}`)
         .setDescription(`Kata **${word.toUpperCase()}** tidak valid!\n**Alasan:** ${reason}`)
@@ -98,7 +97,7 @@ export function createWrongEmbed(user: User, word: string, reason: string, lives
     return { embeds: [embed] };
 }
 
-export function createEliminatedEmbed(user: User, finalPoints: number, correctCount: number, wrongCount: number, remainingPlayersStr: string) {
+export function createEliminatedEmbed(user, finalPoints, correctCount, wrongCount, remainingPlayersStr) {
     const embed = new EmbedBuilder()
         .setTitle(`💀 ${user.username.toUpperCase()} DIELIMINASI!`)
         .setDescription(`Nyawa habis! <@${user.id}> keluar dari permainan.`)
@@ -113,7 +112,7 @@ export function createEliminatedEmbed(user: User, finalPoints: number, correctCo
     return { embeds: [embed] };
 }
 
-export function createGameEndEmbed(level: number, levelName: string, winner: any, players: any[], statsStr: string) {
+export function createGameEndEmbed(level, levelName, winner, players, statsStr) {
     const embed = new EmbedBuilder()
         .setTitle(`🏆 GAME SELESAI! | Level ${level} - ${levelName}`)
         .setDescription(winner ? `🎉 Selamat kepada <@${winner.userId}>!` : "🤝 Permainan berakhir seri!")
@@ -129,7 +128,7 @@ export function createGameEndEmbed(level: number, levelName: string, winner: any
         { name: "💾 Database", value: "Stats semua pemain telah disimpan!", inline: false }
     );
 
-    const components = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    const components = new ActionRowBuilder().addComponents(
         new ButtonBuilder().setLabel("🔄 REMATCH").setStyle(ButtonStyle.Primary).setCustomId("sk_rematch"),
         new ButtonBuilder().setLabel("📊 STATS").setStyle(ButtonStyle.Secondary).setCustomId("sk_stats")
     );

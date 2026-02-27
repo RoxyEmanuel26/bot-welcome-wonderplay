@@ -9,7 +9,8 @@ const buildUserHelpEmbed = (user: any) => {
             {
                 name: '🕹️ Minigames: Sambung Kata',
                 value: 'Game seru menyambung suku kata terakhir berbatas waktu!\n\n' +
-                    '• **`/sk`** atau **`!sk`** : Memulai game atau masuk ke Lobby.\n' +
+                    '• **`/sk`** : Memulai game lewat Slash Command (discord akan memintamu memilih level 1-5).\n' +
+                    '• **`!sk <level>`** : Memulai game lewat Prefix. Contoh: `!sk 3` (untuk level 3).\n' +
                     '• **`/skstats`** atau **`!skstats`** : Melihat statistik poin, nyawa, dan level kamu.\n' +
                     '• **`/sktop`** atau **`!sktop`** : Menampilkan Leaderboard pemain terbaik Global.',
                 inline: false
