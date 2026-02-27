@@ -132,6 +132,56 @@ client.on('interactionCreate', async (interaction: Interaction) => {
             } else {
                 return interaction.reply({ content: '❌ Game tidak ditemukan atau sudah dibatalkan.', ephemeral: true });
             }
+        } else if (customId === 'sk_stats') {
+            // Show the user's stats via ephemeral reply
+            await interaction.deferReply();
+            try {
+                const Player = (await import('./database/models/Player.js')).default;
+                const { getUserPoints, getPlayerRank, getPointsByGame } = await import('./utils/pointsManager.js');
+                const { EmbedBuilder } = await import('discord.js');
+
+                const guildId = interaction.guildId!;
+                const userId = interaction.user.id;
+
+                const sharedPoints = await getUserPoints(guildId, userId);
+                const rankInfo = await getPlayerRank(guildId, userId);
+                const skStatsShared = await getPointsByGame(guildId, userId, 'sambung_kata');
+                const playerStats = await Player.findOne({ userId });
+
+                if (!sharedPoints && !playerStats) {
+                    return interaction.editReply({ content: '❌ Belum ada data statistik untuk kamu.' });
+                }
+
+                const totalPts = sharedPoints ? sharedPoints.totalPoints : 0;
+                const weeklyPts = sharedPoints ? sharedPoints.weeklyPoints : 0;
+                const skPlayed = playerStats ? playerStats.stats.totalGames : 0;
+                const skWins = playerStats ? playerStats.stats.totalWins : 0;
+                const skCorrect = playerStats ? playerStats.stats.totalCorrect : 0;
+                const skWrong = playerStats ? playerStats.stats.totalWrong : 0;
+
+                const embed = new EmbedBuilder()
+                    .setTitle(`📊 Stats Kamu — ${interaction.user.username}`)
+                    .setColor('#00b0f4')
+                    .setThumbnail(interaction.user.displayAvatarURL())
+                    .addFields(
+                        { name: '💎 Total Points', value: `${totalPts} pt | Rank #${rankInfo && rankInfo.rank > 0 ? rankInfo.rank : '-'}`, inline: true },
+                        { name: '📅 Weekly', value: `${weeklyPts} pt`, inline: true },
+                        { name: '🎮 Sambung Kata', value: `Main: ${skPlayed} | Win: ${skWins}\n✅ Benar: ${skCorrect} | ❌ Salah: ${skWrong}`, inline: false },
+                        { name: '🏆 SK Points', value: `${skStatsShared ? skStatsShared.totalFromGame : 0} pt`, inline: true }
+                    )
+                    .setFooter({ text: 'WonderPlay Bot • Statistik Pemain' })
+                    .setTimestamp();
+
+                return interaction.editReply({ embeds: [embed] });
+            } catch (error) {
+                console.error('❌ Error loading stats button:', error);
+                return interaction.editReply({ content: '❌ Gagal memuat statistik.' });
+            }
+        } else if (customId === 'sk_rematch') {
+            // Prompt a rematch by telling users how to start a new game
+            await interaction.reply({
+                content: `🔄 **REMATCH!** <@${interaction.user.id}> ingin bermain lagi!\nGunakan \`/sk\` atau \`!sk <level>\` untuk memulai game baru di channel ini.`,
+            });
         }
         return;
     }

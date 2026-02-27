@@ -42,11 +42,15 @@ export default {
             level = interaction.options.getInteger('level') || 1;
             await interaction.deferReply();
         } else {
-            if (args && args.length > 0) {
-                level = parseInt(args[0]);
+            if (!args || args.length === 0) {
+                const embed = new EmbedBuilder()
+                    .setColor('Yellow')
+                    .setDescription('⚠️ Kamu harus memasukkan level!\n\n**Cara pakai:** `!sk <level>`\nContoh: `!sk 1`, `!sk 3`, `!sk 5`\n\n**Level tersedia:**\n1️⃣ Pemula | 2️⃣ Mudah | 3️⃣ Menengah | 4️⃣ Sulit | 5️⃣ Brutal');
+                return (interactionOrMessage as Message).reply({ embeds: [embed] });
             }
+            level = parseInt(args[0]);
             if (!level || isNaN(level) || level < 1 || level > 5) {
-                const embed = new EmbedBuilder().setColor('Red').setDescription('❌ Level tidak valid! Pilih level 1-5.');
+                const embed = new EmbedBuilder().setColor('Red').setDescription('❌ Level tidak valid! Pilih level 1-5.\n\nContoh: `!sk 1`, `!sk 3`, `!sk 5`');
                 return (interactionOrMessage as Message).reply({ embeds: [embed] });
             }
         }

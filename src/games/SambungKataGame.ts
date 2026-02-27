@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import { ThreadAutoArchiveDuration, GuildMember, TextChannel, Message, ThreadChannel } from 'discord.js';
+import { ThreadAutoArchiveDuration, GuildMember, TextChannel, Message, ThreadChannel, PermissionsBitField } from 'discord.js';
 import { validateWord, getRandomStartWord, getWordSuffix, checkWordPrefix } from '../utils/kbbiAPI.js';
 import { calculatePoint } from '../utils/pointCalculator.js';
 import { getLengthFeedback, LevelConfig, LEVELS } from './LevelConfig.js';
@@ -82,6 +82,29 @@ export default class SambungKataGame {
         this.turnTimer = null;
         this.lobbyTimer = null;
         this.startTime = new Date();
+    }
+
+    /**
+     * Safely send a message to the game thread.
+     * If the channel was deleted or is unavailable, gracefully end the game instead of crashing.
+     */
+    private async safeSend(options: any): Promise<Message | null> {
+        if (!this.thread) return null;
+        try {
+            return await this.thread.send(options);
+        } catch (error: any) {
+            if (error?.code === 10003 || error?.code === 10008 || error?.status === 404) {
+                console.error(`⚠️ Game ${this.gameId}: Channel/Thread tidak ditemukan. Mengakhiri game secara otomatis.`);
+                this.thread = null;
+                if (this.turnTimer) clearTimeout(this.turnTimer);
+                if (this.lobbyTimer) clearTimeout(this.lobbyTimer);
+                this.status = 'ended';
+                gameManager.endGame(this.guildId, this.channelId);
+                return null;
+            }
+            console.error(`⚠️ Game ${this.gameId}: Error saat mengirim pesan:`, error.message);
+            return null;
+        }
     }
 
     private getLivesEmoji(userId: string): string {
@@ -186,15 +209,18 @@ export default class SambungKataGame {
             reason: 'WonderPlay Sambung Kata Game Thread'
         });
 
-        // Add all players to thread
+        // Add all players to thread & grant SendMessagesInThreads permission
         for (const userId of this.players.keys()) {
             await this.thread.members.add(userId).catch(() => { });
+            await channel.permissionOverwrites.edit(userId, {
+                SendMessagesInThreads: true
+            }).catch(() => { });
         }
 
         this.currentWord = getRandomStartWord(this.level);
         this.usedWords.add(this.currentWord);
 
-        await this.thread.send(`🚀 **GAME DIMULAI!**\nKata pertama kita adalah: **${this.currentWord.toUpperCase()}**\n\nSelamat bermain dan semoga beruntung!`);
+        await this.safeSend(`🚀 **GAME DIMULAI!**\nKata pertama kita adalah: **${this.currentWord.toUpperCase()}**\n\nSelamat bermain dan semoga beruntung!`);
 
         await this.prepareNextTurn();
     }
@@ -244,7 +270,7 @@ export default class SambungKataGame {
             Array.from(this.usedWords).slice(-5).join(', ') // Tampilkan 5 terakhir
         );
 
-        await this.thread.send({ content, embeds });
+        await this.safeSend({ content, embeds });
 
         this.turnStartTime = Date.now();
         this.turnTimer = setTimeout(() => this.handleTimeout(currentUserId), this.levelConfig.timeLimit * 1000 + 1000); // 1s grace period
@@ -267,7 +293,7 @@ export default class SambungKataGame {
         } else {
             // Give them another chance or just let it pass and let them retry...
             // Specification says: "JIKA WAKTU HABIS: Kurangi 1 nyawa, TIMEOUT embed, Auto lanjut ke giliran berikutnya"
-            await this.thread.send(`⏱️ Waktu habis <@${userId}>! Kamu kehilangan 1 nyawa.\nSisa nyawa: ${this.getLivesEmoji(userId)}`);
+            await this.safeSend(`⏱️ Waktu habis <@${userId}>! Kamu kehilangan 1 nyawa.\nSisa nyawa: ${this.getLivesEmoji(userId)}`);
         }
 
         await this.prepareNextTurn();
@@ -331,7 +357,7 @@ export default class SambungKataGame {
         } else {
             const timeLeft = Math.max(0, Math.floor((this.levelConfig.timeLimit * 1000 - (Date.now() - this.turnStartTime)) / 1000));
             const { embeds } = createWrongEmbed(player.member.user, word, reason, this.getLivesEmoji(userId), timeLeft);
-            await this.thread.send({ embeds });
+            await this.safeSend({ embeds });
 
             // Re-setup timer based on remaining time
             if (timeLeft > 0) {
@@ -382,7 +408,7 @@ export default class SambungKataGame {
             getLengthFeedback(word.length) // passing the feedback string
         );
 
-        await this.thread.send({ embeds });
+        await this.safeSend({ embeds });
         await this.prepareNextTurn();
     }
 
@@ -399,7 +425,7 @@ export default class SambungKataGame {
             : 'Tidak ada';
 
         const { embeds } = createEliminatedEmbed(player.member.user, player.points, player.correct, player.wrong, remainingStr);
-        await this.thread.send({ embeds });
+        await this.safeSend({ embeds });
     }
 
     public async endGame(): Promise<void> {
@@ -444,9 +470,7 @@ export default class SambungKataGame {
             statsStr
         );
 
-        if (this.thread) {
-            await this.thread.send({ content: "🏆 **PERMAINAN SELESAI!**", embeds, components });
-        }
+        await this.safeSend({ content: "🏆 **PERMAINAN SELESAI!**", embeds, components });
 
         await this.saveToDatabase(winnerId, ranking, totalDurationSec);
 
