@@ -39,7 +39,7 @@ export async function validateWord(word: string): Promise<KbbiValidationResult> 
             // Update usage count (fire-and-forget, no await needed)
             WordHistory.updateOne(
                 { word: wordLower },
-                { $inc: { usageCount: 1 }, lastUsed: new Date() }
+                { $inc: { usageCount: 1 }, $set: { lastUsed: new Date() } }
             ).catch(() => { });
 
             return result;

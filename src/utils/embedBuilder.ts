@@ -92,7 +92,7 @@ export function createWrongEmbed(user: User, word: string, reason: string, lives
         .addFields(
             { name: "❌ Peraturan", value: `- Huruf awal salah\n- Kata tidak ada di KBBI\n- Kata sudah dipakai`, inline: false },
             { name: "❤️ Sisa Nyawa", value: livesEmoji, inline: false },
-            { name: "⚠️ Info", value: `Kamu masih bisa jawab! Sisa waktu: ${timeLeft}s`, inline: false }
+            { name: "⚠️ Info", value: timeLeft > 0 ? `⏱️ Kamu masih bisa jawab! Sisa waktu: **${timeLeft}s**` : `⌛ Waktu sudah habis untuk kata ini. Giliran akan berpindah.`, inline: false }
         );
 
     return { embeds: [embed] };

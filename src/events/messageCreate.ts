@@ -23,18 +23,17 @@ export default {
         }
 
         // --- 2. LOBBY JOIN HANDLER ---
-        // User join lobby via reply
+        // User join lobby via reply (O(1) lookup)
         if (message.reference && message.reference.messageId && message.member) {
-            for (const game of (gameManager as any).activeGames.values()) {
-                if (game.status === 'lobby' && game.lobbyMessage && game.lobbyMessage.id === message.reference.messageId) {
-                    const joined = game.addPlayer(message.member);
-                    if (joined) {
-                        message.react('✅').catch(() => { });
-                    } else {
-                        message.react('❌').catch(() => { });
-                    }
-                    return;
+            const game = gameManager.getGameByLobby(message.reference.messageId);
+            if (game && game.status === 'lobby') {
+                const joined = (game as any).addPlayer(message.member);
+                if (joined) {
+                    message.react('✅').catch(() => { });
+                } else {
+                    message.react('❌').catch(() => { });
                 }
+                return;
             }
         }
 

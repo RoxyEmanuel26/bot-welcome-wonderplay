@@ -42,48 +42,50 @@ export async function addSambungKataPoints(
     try {
         const reason = `Level: ${gameData.level} | Benar: ${gameData.correctAnswers}x | Salah: ${gameData.wrongAnswers}x | Avg: ${gameData.avgResponseTime.toFixed(1)}s | Bonus: ${gameData.bonuses.map(b => b.name).join(',')}`;
 
-        const updateDoc: any = {
-            $set: { username, lastPlayedAt: new Date() },
-            $inc: {
-                totalPoints: points,
-                weeklyPoints: points,
-                monthlyPoints: points,
-                gamesPlayed: 1,
-                gamesWon: isWinner ? 1 : 0
-            },
-            $push: {
-                pointsHistory: {
-                    $each: [{
-                        game: 'sambung_kata',
-                        points,
-                        reason,
-                        earnedAt: new Date()
-                    }],
-                    $slice: -50
-                }
-            }
+        const newHistoryItem = {
+            game: 'sambung_kata',
+            points,
+            reason,
+            earnedAt: new Date()
         };
 
-        // Handle currentStreak logic
-        if (isWinner) {
-            updateDoc.$inc.currentStreak = 1;
-        } else {
-            updateDoc.$set.currentStreak = 0;
-        }
+        // Single atomic aggregation pipeline update — eliminates longestStreak race condition
+        const pipeline: any[] = [
+            {
+                $set: {
+                    username,
+                    lastPlayedAt: new Date(),
+                    totalPoints: { $add: [{ $ifNull: ['$totalPoints', 0] }, points] },
+                    weeklyPoints: { $add: [{ $ifNull: ['$weeklyPoints', 0] }, points] },
+                    monthlyPoints: { $add: [{ $ifNull: ['$monthlyPoints', 0] }, points] },
+                    gamesPlayed: { $add: [{ $ifNull: ['$gamesPlayed', 0] }, 1] },
+                    gamesWon: { $add: [{ $ifNull: ['$gamesWon', 0] }, isWinner ? 1 : 0] },
+                    currentStreak: isWinner
+                        ? { $add: [{ $ifNull: ['$currentStreak', 0] }, 1] }
+                        : 0,
+                    longestStreak: isWinner
+                        ? {
+                            $max: [
+                                { $ifNull: ['$longestStreak', 0] },
+                                { $add: [{ $ifNull: ['$currentStreak', 0] }, 1] }
+                            ]
+                        }
+                        : { $ifNull: ['$longestStreak', 0] },
+                    pointsHistory: {
+                        $slice: [
+                            { $concatArrays: [{ $ifNull: ['$pointsHistory', []] }, [newHistoryItem]] },
+                            -50
+                        ]
+                    }
+                }
+            }
+        ];
 
         const result = await GamePoints.findOneAndUpdate(
             { guildId, userId },
-            updateDoc,
+            pipeline,
             { upsert: true, new: true }
         ).lean() as any;
-
-        if (result && result.currentStreak > result.longestStreak) {
-            await GamePoints.updateOne(
-                { _id: result._id },
-                { $set: { longestStreak: result.currentStreak } }
-            );
-            result.longestStreak = result.currentStreak;
-        }
 
         console.log(`✅ [sambung_kata] ${username} +${points}pts | Total: ${result?.totalPoints || 0}`);
         return result;
