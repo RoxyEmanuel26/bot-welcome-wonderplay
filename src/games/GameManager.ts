@@ -4,8 +4,6 @@ import SambungKataGame from './SambungKataGame.js';
 class GameManager {
     public activeGames: Map<string, SambungKataGame>;
 
-    public guildId: string;
-
     constructor() {
         this.activeGames = new Map(); // key: guildId_channelId
     }
@@ -45,6 +43,27 @@ class GameManager {
 
     getActiveGameCount(): number {
         return this.activeGames.size;
+    }
+
+    async shutdownAllGames(): Promise<void> {
+        let count = 0;
+        for (const [key, game] of this.activeGames.entries()) {
+            if (game.status === 'playing' || game.status === 'lobby') {
+                try {
+                    // Try to send a message to cancel
+                    // Thread or Lobby message might exist depending on state
+                    const channelOrThread = (game as any).thread || (game as any).lobbyMessage?.channel;
+                    if (channelOrThread && 'send' in channelOrThread) {
+                        await channelOrThread.send('⚠️ **PERMAINAN DIBATALKAN**\nBot sedang melakukan *maintenance* atau *restart* mendadak. Mohon maaf atas ketidaknyamanan ini! 🙏');
+                    }
+                    game.endGame();
+                    count++;
+                } catch (e) {
+                    console.error(`Gagal mematikan game ${key}:`, e);
+                }
+            }
+        }
+        console.log(`✅ Graceful shutdown completed: ${count} games cleaned up.`);
     }
 }
 

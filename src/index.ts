@@ -125,8 +125,8 @@ client.on('interactionCreate', async (interaction: Interaction) => {
                 }
                 await interaction.deferUpdate();
                 await interaction.message.edit({ components: [] });
-                if (interaction.channel) {
-                    await interaction.channel.send('✅ Permainan Dibatalkan oleh Host.');
+                if (interaction.channel && 'send' in interaction.channel) {
+                    await (interaction.channel as any).send('✅ Permainan Dibatalkan oleh Host.');
                 }
                 (await import('./games/GameManager.js')).default.endGame(game.guildId, game.channelId);
             } else {
@@ -176,3 +176,24 @@ client.once('ready', async () => {
 // ═══════════════════════════════════════════════════════════════
 
 client.login(process.env.DISCORD_TOKEN);
+
+// ═══════════════════════════════════════════════════════════════
+// 🛑 GRACEFUL SHUTDOWN
+// ═══════════════════════════════════════════════════════════════
+
+async function shutdown() {
+    console.log('\n🛑 Terdeteksi sinyal shutdown! Membersihkan sesi game yang sedang aktif...');
+    try {
+        const gameManager = (await import('./games/GameManager.js')).default;
+        await gameManager.shutdownAllGames();
+    } catch (err) {
+        console.error('❌ Error saat pembersihan:', err);
+    }
+    console.log('🔌 Menutup koneksi Discord API...');
+    client.destroy();
+    console.log('👋 Bot berhasil dimatikan.');
+    process.exit(0);
+}
+
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);

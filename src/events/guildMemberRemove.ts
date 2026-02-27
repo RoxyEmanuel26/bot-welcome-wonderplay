@@ -41,7 +41,7 @@ export default {
                     .setDescription(`**${member.user.username}** baru saja meninggalkan server ini.\nSemoga kita berjumpa lagi di lain waktu!`)
                     .setThumbnail(member.user.displayAvatarURL())
                     .setTimestamp()
-                    .setFooter({ text: `Member count: ${member.guild.memberCount}`, iconURL: member.guild.iconURL() || null });
+                    .setFooter({ text: `Member count: ${member.guild.memberCount}`, iconURL: member.guild.iconURL() || undefined });
 
                 await channel.send({ embeds: [embed] });
             } else {

@@ -1,0 +1,23 @@
+﻿src/commands/stats.ts(13,50): error TS2322: Type 'bigint' is not assignable to type 'never'.
+src/commands/testRouletteVoice.ts(29,54): error TS2322: Type 'bigint' is not assignable to type 'never'.
+src/commands/welc.ts(13,49): error TS2345: Argument of type 'bigint[]' is not assignable to parameter of type 'never[]'.
+  Type 'bigint' is not assignable to type 'never'.
+src/events/guildMemberRemove.ts(44,85): error TS2322: Type 'string | null' is not assignable to type 'string | undefined'.
+  Type 'null' is not assignable to type 'string | undefined'.
+src/games/GameManager.ts(7,12): error TS2564: Property 'guildId' has no initializer and is not definitely assigned in the constructor.
+src/games/SambungKataGame.ts(1,30): error TS7016: Could not find a declaration file for module 'uuid'. 'E:/00 projek rumah/bot discord/bot-welcome-wonderplay/node_modules/uuid/wrapper.mjs' implicitly has an 'any' type.
+  Try `npm i --save-dev @types/uuid` if it exists or add a new declaration (.d.ts) file containing `declare module 'uuid';`
+src/games/SambungKataGame.ts(242,13): error TS2345: Argument of type 'null' is not assignable to parameter of type 'string'.
+src/index.ts(129,47): error TS2339: Property 'send' does not exist on type 'TextBasedChannel'.
+  Property 'send' does not exist on type 'PartialGroupDMChannel'.
+src/utils/matchHistory.ts(5,5): error TS7034: Variable 'matchHistory' implicitly has type 'any[]' in some locations where its type cannot be determined.
+src/utils/matchHistory.ts(28,57): error TS7005: Variable 'matchHistory' implicitly has an 'any[]' type.
+src/utils/matchHistory.ts(30,56): error TS18046: 'err' is of type 'unknown'.
+src/utils/matchHistory.ts(38,32): error TS7006: Parameter 'match' implicitly has an 'any' type.
+src/utils/matchHistory.ts(43,40): error TS7006: Parameter 'p' implicitly has an 'any' type.
+src/utils/matchHistory.ts(44,40): error TS7006: Parameter 'p' implicitly has an 'any' type.
+src/utils/matchHistory.ts(45,42): error TS7006: Parameter 'p' implicitly has an 'any' type.
+src/utils/matchHistory.ts(57,12): error TS7005: Variable 'matchHistory' implicitly has an 'any[]' type.
+src/utils/permissions.ts(3,34): error TS7006: Parameter 'message' implicitly has an 'any' type.
+src/utils/valorantMaps.ts(40,30): error TS7006: Parameter 'array' implicitly has an 'any' type.
+src/utils/valorantMaps.ts(54,28): error TS7006: Parameter 'players' implicitly has an 'any' type.

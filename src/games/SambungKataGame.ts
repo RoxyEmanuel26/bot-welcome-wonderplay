@@ -239,7 +239,7 @@ export default class SambungKataGame {
             this.currentSuffixLength,
             this.levelConfig,
             this.getLivesEmoji(currentUserId),
-            null,
+            '',
             this.getLiveScoreboard(),
             Array.from(this.usedWords).slice(-5).join(', ') // Tampilkan 5 terakhir
         );

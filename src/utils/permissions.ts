@@ -1,6 +1,8 @@
-import { PermissionFlagsBits } from 'discord.js';
+import { Message, PermissionResolvable } from 'discord.js';
 
-export function checkPermissions(message, requiredPerms = []) {
+export function checkPermissions(message: Message, requiredPerms: PermissionResolvable[] = []) {
+  if (!message.guild || !message.member) return { allowed: false, role: null };
+
   // Server Owner always has access
   if (message.guild.ownerId === message.author.id) {
     return { allowed: true, role: 'Server Owner' };

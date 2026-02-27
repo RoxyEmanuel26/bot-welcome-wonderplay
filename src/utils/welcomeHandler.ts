@@ -16,25 +16,14 @@ export async function sendWelcomeMessage(member: GuildMember, channel: TextChann
         let finalText = '';
         let messageId: number | string = 0; // default ID
 
-        // Coba pakai Gemini AI dulu kalau fiturnya dinyalakan
-        let aiMessage = null;
-        if (process.env.USE_GEMINI_AI?.toLowerCase() === 'on') {
-            aiMessage = await generateWelcomeAI(member);
-        }
+        // Pakai pesan dari file txt
+        const messageObj = getRandomMessage();
+        if (!messageObj) throw new Error('No messages available');
 
-        if (aiMessage) {
-            finalText = `<@${member.id}>, AI says: \n${aiMessage}`;
-            messageId = 'ai_generated';
-        } else {
-            // Fallback ke pesan dari file txt
-            const messageObj = getRandomMessage();
-            if (!messageObj) throw new Error('No messages available');
-
-            finalText = messageObj.text
-                .replace(/@user/g, `<@${member.id}>`)
-                .replace(/WonderPlay/g, member.guild.name);
-            messageId = messageObj.id;
-        }
+        finalText = messageObj.text
+            .replace(/@user/g, `<@${member.id}>`)
+            .replace(/WonderPlay/g, member.guild.name);
+        messageId = messageObj.id;
 
         // 2. Siapkan dan Kirim Canvas Image + Embed ke Channel Banner
         if (process.env.FITUR_WELCOME_BANNER?.toLowerCase() === 'on') {
@@ -78,7 +67,7 @@ export async function sendWelcomeMessage(member: GuildMember, channel: TextChann
         }
 
         // 4. Update Stats (Selalu Menyala)
-        updateStats(messageId as string); // Assuming statsManager accepts string/number interchangeably or mostly string due to ID.
+        updateStats(messageId.toString());
 
         console.log(`✅ Welcome sent for ${member.user.tag} | Message ID: ${messageId}`);
         return true;

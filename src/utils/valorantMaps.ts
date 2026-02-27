@@ -37,7 +37,7 @@ export function getRandomMap() {
  * @param {Array} array
  * @returns {Array}
  */
-export function shuffleArray(array) {
+export function shuffleArray<T>(array: T[]): T[] {
     const shuffled = [...array];
     for (let i = shuffled.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -51,7 +51,7 @@ export function shuffleArray(array) {
  * @param {Array} players - Array of GuildMember atau objek {id, username}
  * @returns {{ attackers: Array, defenders: Array, spectators: Array }}
  */
-export function splitTeams(players) {
+export function splitTeams<T>(players: T[]): { attackers: T[], defenders: T[], spectators: T[] } {
     const shuffled = shuffleArray(players);
     const half = Math.floor(shuffled.length / 2);
 
