@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import { ThreadAutoArchiveDuration, GuildMember, TextChannel, Message, ThreadChannel, PermissionsBitField } from 'discord.js';
+import { ThreadAutoArchiveDuration, GuildMember, TextChannel, Message, ThreadChannel } from 'discord.js';
 import { validateWord, getRandomStartWord, getWordSuffix, checkWordPrefix } from '../utils/kbbiAPI.js';
 import { calculatePoint } from '../utils/pointCalculator.js';
 import { getLengthFeedback, LevelConfig, LEVELS } from './LevelConfig.js';
@@ -209,18 +209,43 @@ export default class SambungKataGame {
             reason: 'WonderPlay Sambung Kata Game Thread'
         });
 
-        // Add all players to thread & grant SendMessagesInThreads permission
+        // Add all players to thread
         for (const userId of this.players.keys()) {
             await this.thread.members.add(userId).catch(() => { });
-            await channel.permissionOverwrites.edit(userId, {
-                SendMessagesInThreads: true
-            }).catch(() => { });
         }
 
         this.currentWord = getRandomStartWord(this.level);
         this.usedWords.add(this.currentWord);
 
         await this.safeSend(`🚀 **GAME DIMULAI!**\nKata pertama kita adalah: **${this.currentWord.toUpperCase()}**\n\nSelamat bermain dan semoga beruntung!`);
+
+        await this.prepareNextTurn();
+    }
+
+    /**
+     * Start a rematch game reusing an existing thread.
+     */
+    public async startRematch(existingThread: ThreadChannel, parentChannel: TextChannel): Promise<void> {
+        if (this.status !== 'lobby') return;
+        if (this.lobbyTimer) clearTimeout(this.lobbyTimer);
+        this.status = 'playing';
+
+        // Shuffle player turn
+        this.turnOrder = Array.from(this.players.keys()).sort(() => 0.5 - Math.random());
+        this.currentTurnIndex = 0;
+
+        // Reuse existing thread
+        this.thread = existingThread;
+
+        // Add all players to thread
+        for (const userId of this.players.keys()) {
+            await this.thread.members.add(userId).catch(() => { });
+        }
+
+        this.currentWord = getRandomStartWord(this.level);
+        this.usedWords.add(this.currentWord);
+
+        await this.safeSend(`🔄 **REMATCH! GAME DIMULAI!**\nKata pertama kita adalah: **${this.currentWord.toUpperCase()}**\n\nSelamat bermain dan semoga beruntung!`);
 
         await this.prepareNextTurn();
     }
@@ -267,7 +292,7 @@ export default class SambungKataGame {
             this.getLivesEmoji(currentUserId),
             '',
             this.getLiveScoreboard(),
-            Array.from(this.usedWords).slice(-5).join(', ') // Tampilkan 5 terakhir
+            Array.from(this.usedWords).slice(-20).join(', ') // Tampilkan 20 terakhir
         );
 
         await this.safeSend({ content, embeds });
@@ -470,7 +495,31 @@ export default class SambungKataGame {
             statsStr
         );
 
-        await this.safeSend({ content: "🏆 **PERMAINAN SELESAI!**", embeds, components });
+        const endMsg = await this.safeSend({ content: "🏆 **PERMAINAN SELESAI!**", embeds, components });
+
+        // Store rematch data for 10 seconds
+        if (endMsg && this.thread) {
+            gameManager.storeRematchData(endMsg.id, {
+                hostId: this.hostId,
+                level: this.level,
+                playerIds: Array.from(this.players.keys()),
+                guildId: this.guildId,
+                channelId: this.channelId,
+                threadId: this.thread.id
+            });
+
+            // Disable buttons after 10 seconds
+            const msgRef = endMsg;
+            setTimeout(async () => {
+                try {
+                    const disabledComponents = new (await import('discord.js')).ActionRowBuilder<any>().addComponents(
+                        new (await import('discord.js')).ButtonBuilder().setLabel('🔄 REMATCH').setStyle(2).setCustomId('sk_rematch').setDisabled(true),
+                        new (await import('discord.js')).ButtonBuilder().setLabel('📊 STATS').setStyle(2).setCustomId('sk_stats')
+                    );
+                    await msgRef.edit({ components: [disabledComponents] }).catch(() => { });
+                } catch { }
+            }, 10000);
+        }
 
         await this.saveToDatabase(winnerId, ranking, totalDurationSec);
 

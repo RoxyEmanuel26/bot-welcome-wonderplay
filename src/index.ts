@@ -178,10 +178,87 @@ client.on('interactionCreate', async (interaction: Interaction) => {
                 return interaction.editReply({ content: '❌ Gagal memuat statistik.' });
             }
         } else if (customId === 'sk_rematch') {
-            // Prompt a rematch by telling users how to start a new game
-            await interaction.reply({
-                content: `🔄 **REMATCH!** <@${interaction.user.id}> ingin bermain lagi!\nGunakan \`/sk\` atau \`!sk <level>\` untuk memulai game baru di channel ini.`,
-            });
+            // Auto-rematch using stored game data
+            const gm = (await import('./games/GameManager.js')).default;
+            const rematchInfo = gm.getRematchData(interaction.message.id);
+
+            if (!rematchInfo) {
+                return interaction.reply({ content: '⏱️ Waktu rematch sudah habis (10 detik). Silakan mulai game baru dengan `/sk` atau `!sk <level>`.', ephemeral: true });
+            }
+
+            // Only host can rematch
+            if (interaction.user.id !== rematchInfo.hostId) {
+                return interaction.reply({ content: `❌ Hanya Host (<@${rematchInfo.hostId}>) yang dapat memulai rematch!`, ephemeral: true });
+            }
+
+            await interaction.deferReply();
+            try {
+                const guild = interaction.guild;
+                if (!guild) return interaction.editReply({ content: '❌ Guild tidak ditemukan.' });
+
+                // Get parent channel and existing thread
+                const parentChannel = await guild.channels.fetch(rematchInfo.channelId).catch(() => null) as any;
+                const existingThread = await guild.channels.fetch(rematchInfo.threadId).catch(() => null) as any;
+
+                if (!parentChannel || !existingThread) {
+                    return interaction.editReply({ content: '❌ Channel atau thread tidak ditemukan.' });
+                }
+
+                // Check if there's already an active game
+                const existingGame = gm.getGame(guild.id, parentChannel.id);
+                if (existingGame) {
+                    return interaction.editReply({ content: '❌ Sudah ada game aktif di channel tersebut!' });
+                }
+
+                // Get host member
+                const hostMember = await guild.members.fetch(rematchInfo.hostId).catch(() => null);
+                if (!hostMember) return interaction.editReply({ content: '❌ Host tidak ditemukan di server.' });
+
+                // Create new game
+                const newGame = gm.createGame(guild, parentChannel, hostMember, rematchInfo.level);
+                if (!newGame) {
+                    return interaction.editReply({ content: '❌ Gagal membuat game baru.' });
+                }
+
+                // Add all previous players
+                for (const playerId of rematchInfo.playerIds) {
+                    if (playerId === hostMember.id) continue;
+                    const member = await guild.members.fetch(playerId).catch(() => null);
+                    if (member) {
+                        newGame.addPlayer(member);
+                    }
+                }
+
+                if (newGame.players.size < 2) {
+                    gm.endGame(guild.id, parentChannel.id);
+                    return interaction.editReply({ content: '❌ Minimal 2 pemain untuk rematch! Pemain sebelumnya mungkin sudah tidak ada di server.' });
+                }
+
+                // Remove rematch data so button can't be clicked again
+                gm.rematchData.delete(interaction.message.id);
+
+                // Disable the rematch button on the old message
+                const { ActionRowBuilder, ButtonBuilder } = await import('discord.js');
+                const disabledRow = new ActionRowBuilder<any>().addComponents(
+                    new ButtonBuilder().setLabel('🔄 REMATCH').setStyle(2).setCustomId('sk_rematch').setDisabled(true),
+                    new ButtonBuilder().setLabel('📊 STATS').setStyle(2).setCustomId('sk_stats')
+                );
+                await interaction.message.edit({ components: [disabledRow] }).catch(() => { });
+
+                const playerList = Array.from(newGame.players.values()).map(p => `<@${p.member.id}>`).join(', ');
+                await interaction.editReply({
+                    content: `🔄 **REMATCH!** Level ${rematchInfo.level} dimulai ulang!\n👥 Pemain: ${playerList}\n\n⏳ Memulai game...`
+                });
+
+                // Start rematch in the same thread
+                await newGame.startRematch(existingThread, parentChannel);
+
+            } catch (error) {
+                console.error('❌ Error rematch:', error);
+                if (interaction.deferred || interaction.replied) {
+                    await interaction.editReply({ content: '❌ Terjadi error saat memulai rematch.' }).catch(() => { });
+                }
+            }
         }
         return;
     }

@@ -1,11 +1,34 @@
 import { Guild, TextChannel, User, GuildMember } from 'discord.js';
 import SambungKataGame from './SambungKataGame.js';
 
+export interface RematchData {
+    hostId: string;
+    level: number;
+    playerIds: string[];
+    guildId: string;
+    channelId: string;
+    threadId: string;
+}
+
 class GameManager {
     public activeGames: Map<string, SambungKataGame>;
+    public rematchData: Map<string, RematchData>; // key: message ID
 
     constructor() {
         this.activeGames = new Map(); // key: guildId_channelId
+        this.rematchData = new Map();
+    }
+
+    storeRematchData(messageId: string, data: RematchData): void {
+        this.rematchData.set(messageId, data);
+        // Auto-expire after 20 seconds
+        setTimeout(() => {
+            this.rematchData.delete(messageId);
+        }, 10000);
+    }
+
+    getRematchData(messageId: string): RematchData | undefined {
+        return this.rematchData.get(messageId);
     }
 
     createGame(guild: Guild, channel: TextChannel, host: GuildMember, level: number): SambungKataGame | null {
@@ -31,9 +54,6 @@ class GameManager {
 
     isUserInGame(userId: string, guildId: string): boolean {
         for (const game of this.activeGames.values()) {
-            // Note: Property 'players' is private/protected depending on implementation.
-            // Assuming it's accessible or we have a getter. If not, we'll need to update SambungKataGame.ts later.
-            // Using logic: game.players.has(userId) from original JS
             if (game.guildId === guildId && (game as any).players.has(userId)) {
                 return true;
             }
@@ -50,8 +70,6 @@ class GameManager {
         for (const [key, game] of this.activeGames.entries()) {
             if (game.status === 'playing' || game.status === 'lobby') {
                 try {
-                    // Try to send a message to cancel
-                    // Thread or Lobby message might exist depending on state
                     const channelOrThread = (game as any).thread || (game as any).lobbyMessage?.channel;
                     if (channelOrThread && 'send' in channelOrThread) {
                         await channelOrThread.send('⚠️ **PERMAINAN DIBATALKAN**\nBot sedang melakukan *maintenance* atau *restart* mendadak. Mohon maaf atas ketidaknyamanan ini! 🙏');
