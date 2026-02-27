@@ -5,11 +5,14 @@
 import dotenv from 'dotenv';
 dotenv.config({ path: './config/.env' });
 
-import { Client, GatewayIntentBits, Partials, Collection, Interaction, Events } from 'discord.js';
+import { Client, GatewayIntentBits, Partials, Collection, Interaction, Events, EmbedBuilder, ActionRowBuilder, ButtonBuilder } from 'discord.js';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { readdirSync } from 'fs';
 import connectDB from './database/connection.js';
+import gameManager from './games/GameManager.js';
+import Player from './database/models/Player.js';
+import { getUserPoints, getPlayerRank, getPointsByGame } from './utils/pointsManager.js';
 
 // Extend Client interface to include commands
 declare module 'discord.js' {
@@ -102,7 +105,7 @@ client.on('interactionCreate', async (interaction: Interaction) => {
 
         if (customId === 'sk_start') {
             // Handler di-delegate ke lobby/game manager, tapi secara sederhana kita dapat menangani lewat interaction
-            const activeGames = Array.from((await import('./games/GameManager.js')).default.activeGames.values());
+            const activeGames = Array.from(gameManager.activeGames.values());
             const game = (activeGames as any[]).find(g => g.lobbyMessage && g.lobbyMessage.id === interaction.message.id);
             if (game) {
                 if (interaction.user.id !== game.hostId) {
@@ -117,7 +120,7 @@ client.on('interactionCreate', async (interaction: Interaction) => {
                 return interaction.reply({ content: '❌ Game tidak ditemukan atau sudah dimulai/berakhir.', ephemeral: true });
             }
         } else if (customId === 'sk_cancel') {
-            const activeGames = Array.from((await import('./games/GameManager.js')).default.activeGames.values());
+            const activeGames = Array.from(gameManager.activeGames.values());
             const game = (activeGames as any[]).find(g => g.lobbyMessage && g.lobbyMessage.id === interaction.message.id);
             if (game) {
                 if (interaction.user.id !== game.hostId) {
@@ -128,7 +131,7 @@ client.on('interactionCreate', async (interaction: Interaction) => {
                 if (interaction.channel && 'send' in interaction.channel) {
                     await (interaction.channel as any).send('✅ Permainan Dibatalkan oleh Host.');
                 }
-                (await import('./games/GameManager.js')).default.endGame(game.guildId, game.channelId);
+                gameManager.endGame(game.guildId, game.channelId);
             } else {
                 return interaction.reply({ content: '❌ Game tidak ditemukan atau sudah dibatalkan.', ephemeral: true });
             }
@@ -136,10 +139,6 @@ client.on('interactionCreate', async (interaction: Interaction) => {
             // Show the user's stats via ephemeral reply
             await interaction.deferReply();
             try {
-                const Player = (await import('./database/models/Player.js')).default;
-                const { getUserPoints, getPlayerRank, getPointsByGame } = await import('./utils/pointsManager.js');
-                const { EmbedBuilder } = await import('discord.js');
-
                 const guildId = interaction.guildId!;
                 const userId = interaction.user.id;
 
@@ -179,8 +178,7 @@ client.on('interactionCreate', async (interaction: Interaction) => {
             }
         } else if (customId === 'sk_rematch') {
             // Auto-rematch using stored game data
-            const gm = (await import('./games/GameManager.js')).default;
-            const rematchInfo = gm.getRematchData(interaction.message.id);
+            const rematchInfo = gameManager.getRematchData(interaction.message.id);
 
             if (!rematchInfo) {
                 return interaction.reply({ content: '⏱️ Waktu rematch sudah habis (10 detik). Silakan mulai game baru dengan `/sk` atau `!sk <level>`.', ephemeral: true });
@@ -205,7 +203,7 @@ client.on('interactionCreate', async (interaction: Interaction) => {
                 }
 
                 // Check if there's already an active game
-                const existingGame = gm.getGame(guild.id, parentChannel.id);
+                const existingGame = gameManager.getGame(guild.id, parentChannel.id);
                 if (existingGame) {
                     return interaction.editReply({ content: '❌ Sudah ada game aktif di channel tersebut!' });
                 }
@@ -215,7 +213,7 @@ client.on('interactionCreate', async (interaction: Interaction) => {
                 if (!hostMember) return interaction.editReply({ content: '❌ Host tidak ditemukan di server.' });
 
                 // Create new game
-                const newGame = gm.createGame(guild, parentChannel, hostMember, rematchInfo.level);
+                const newGame = gameManager.createGame(guild, parentChannel, hostMember, rematchInfo.level);
                 if (!newGame) {
                     return interaction.editReply({ content: '❌ Gagal membuat game baru.' });
                 }
@@ -230,15 +228,14 @@ client.on('interactionCreate', async (interaction: Interaction) => {
                 }
 
                 if (newGame.players.size < 2) {
-                    gm.endGame(guild.id, parentChannel.id);
+                    gameManager.endGame(guild.id, parentChannel.id);
                     return interaction.editReply({ content: '❌ Minimal 2 pemain untuk rematch! Pemain sebelumnya mungkin sudah tidak ada di server.' });
                 }
 
                 // Remove rematch data so button can't be clicked again
-                gm.rematchData.delete(interaction.message.id);
+                gameManager.rematchData.delete(interaction.message.id);
 
                 // Disable the rematch button on the old message
-                const { ActionRowBuilder, ButtonBuilder } = await import('discord.js');
                 const disabledRow = new ActionRowBuilder<any>().addComponents(
                     new ButtonBuilder().setLabel('🔄 REMATCH').setStyle(2).setCustomId('sk_rematch').setDisabled(true),
                     new ButtonBuilder().setLabel('📊 STATS').setStyle(2).setCustomId('sk_stats')

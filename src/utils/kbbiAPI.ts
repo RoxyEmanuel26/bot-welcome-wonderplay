@@ -27,11 +27,11 @@ export async function validateWord(word: string): Promise<KbbiValidationResult> 
             const result: KbbiValidationResult = { valid: cached.isValid, definition: cached.definition };
             memoryCache.set(wordLower, result);
 
-            // Update usage count
-            await WordHistory.updateOne(
+            // Update usage count (fire-and-forget, no await needed)
+            WordHistory.updateOne(
                 { word: wordLower },
                 { $inc: { usageCount: 1 }, lastUsed: new Date() }
-            );
+            ).catch(() => { });
 
             return result;
         }
@@ -43,7 +43,7 @@ export async function validateWord(word: string): Promise<KbbiValidationResult> 
     try {
         const response = await axios.get(
             `${KBBI_BASE_URL}/entry/${encodeURIComponent(wordLower)}`,
-            { timeout: 5000 }
+            { timeout: 3000 }
         );
 
         const data = response.data;
@@ -57,21 +57,18 @@ export async function validateWord(word: string): Promise<KbbiValidationResult> 
         // Simpan ke memory cache
         memoryCache.set(wordLower, result);
 
-        // Simpan ke MongoDB cache
-        try {
-            await WordHistory.create({
-                word: wordLower,
-                isValid,
-                definition,
-                usageCount: 1,
-                lastUsed: new Date()
-            } as any);
-        } catch (dbErr: any) {
-            // Ignore duplicate key error
+        // Simpan ke MongoDB cache (fire-and-forget)
+        WordHistory.create({
+            word: wordLower,
+            isValid,
+            definition,
+            usageCount: 1,
+            lastUsed: new Date()
+        } as any).catch((dbErr: any) => {
             if (dbErr.code !== 11000) {
                 console.warn('⚠️ MongoDB save failed:', dbErr.message);
             }
-        }
+        });
 
         console.log(`🔍 KBBI API: "${wordLower}" → ${isValid ? '✅ Valid' : '❌ Invalid'}`);
         return result;

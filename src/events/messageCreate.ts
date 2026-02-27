@@ -13,16 +13,12 @@ export default {
         if (message.author.bot) return;
 
         // --- 1. GAME MESSAGE HANDLER ---
-        // Cek apakah pesan di dalam thread game
+        // Cek apakah pesan di dalam thread game (O(1) lookup)
         if (message.channel.isThread()) {
-            // Note: gameManager.activeGames is private, but if this works let's temporarily cast
-            for (const game of (gameManager as any).activeGames.values()) {
-                if (game.thread && game.thread.id === message.channel.id) {
-                    if (game.status === 'playing') {
-                        await game.validateAnswer(message);
-                    }
-                    return; // Stop event flow here if it's a game thread messages
-                }
+            const game = gameManager.getGameByThread(message.channel.id);
+            if (game && game.status === 'playing') {
+                await game.validateAnswer(message);
+                return;
             }
         }
 

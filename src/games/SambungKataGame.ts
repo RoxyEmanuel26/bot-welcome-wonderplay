@@ -95,10 +95,12 @@ export default class SambungKataGame {
         } catch (error: any) {
             if (error?.code === 10003 || error?.code === 10008 || error?.status === 404) {
                 console.error(`⚠️ Game ${this.gameId}: Channel/Thread tidak ditemukan. Mengakhiri game secara otomatis.`);
+                const threadId = this.thread?.id;
                 this.thread = null;
                 if (this.turnTimer) clearTimeout(this.turnTimer);
                 if (this.lobbyTimer) clearTimeout(this.lobbyTimer);
                 this.status = 'ended';
+                if (threadId) gameManager.unregisterThread(threadId);
                 gameManager.endGame(this.guildId, this.channelId);
                 return null;
             }
@@ -209,10 +211,15 @@ export default class SambungKataGame {
             reason: 'WonderPlay Sambung Kata Game Thread'
         });
 
-        // Add all players to thread
-        for (const userId of this.players.keys()) {
-            await this.thread.members.add(userId).catch(() => { });
-        }
+        // Register thread for fast lookup
+        gameManager.registerThread(this.thread.id, this);
+
+        // Add all players to thread (parallel)
+        await Promise.all(
+            Array.from(this.players.keys()).map(userId =>
+                this.thread!.members.add(userId).catch(() => { })
+            )
+        );
 
         this.currentWord = getRandomStartWord(this.level);
         this.usedWords.add(this.currentWord);
@@ -237,10 +244,15 @@ export default class SambungKataGame {
         // Reuse existing thread
         this.thread = existingThread;
 
-        // Add all players to thread
-        for (const userId of this.players.keys()) {
-            await this.thread.members.add(userId).catch(() => { });
-        }
+        // Register thread for fast lookup
+        gameManager.registerThread(this.thread.id, this);
+
+        // Add all players to thread (parallel)
+        await Promise.all(
+            Array.from(this.players.keys()).map(userId =>
+                this.thread!.members.add(userId).catch(() => { })
+            )
+        );
 
         this.currentWord = getRandomStartWord(this.level);
         this.usedWords.add(this.currentWord);
@@ -457,6 +469,9 @@ export default class SambungKataGame {
         if (this.status === 'ended') return;
         if (this.turnTimer) clearTimeout(this.turnTimer);
         this.status = 'ended';
+
+        // Unregister thread from fast lookup
+        if (this.thread) gameManager.unregisterThread(this.thread.id);
 
         const alivePlayers = this.getAlivePlayers();
         let winnerId: string | null = null;

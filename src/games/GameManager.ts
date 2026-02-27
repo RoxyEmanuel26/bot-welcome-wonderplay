@@ -13,10 +13,24 @@ export interface RematchData {
 class GameManager {
     public activeGames: Map<string, SambungKataGame>;
     public rematchData: Map<string, RematchData>; // key: message ID
+    public threadGames: Map<string, SambungKataGame>; // key: thread ID → fast lookup
 
     constructor() {
         this.activeGames = new Map(); // key: guildId_channelId
         this.rematchData = new Map();
+        this.threadGames = new Map();
+    }
+
+    registerThread(threadId: string, game: SambungKataGame): void {
+        this.threadGames.set(threadId, game);
+    }
+
+    unregisterThread(threadId: string): void {
+        this.threadGames.delete(threadId);
+    }
+
+    getGameByThread(threadId: string): SambungKataGame | null {
+        return this.threadGames.get(threadId) || null;
     }
 
     storeRematchData(messageId: string, data: RematchData): void {
