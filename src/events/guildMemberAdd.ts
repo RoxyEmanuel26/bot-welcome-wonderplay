@@ -22,7 +22,7 @@ export default {
         // Update Bot Activity realtime
         const totalMembers = client.guilds.cache.reduce((a, g) => a + g.memberCount, 0);
         if (client.user) {
-            client.user.setActivity(`${totalMembers} Members | Owner AeroKatzh`, { type: 3 });
+            client.user.setActivity(`${totalMembers} Members | Owner AeroKatze`, { type: 3 });
         }
 
         // 1. AUTO-ROLE FEATURE
